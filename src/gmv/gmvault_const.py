@@ -74,8 +74,11 @@ conf_version=1.9.1
 scope=https://mail.google.com/
 # The URL root for accessing Google Accounts.
 google_accounts_base_url=https://accounts.google.com
-# Hardcoded dummy redirect URI for non-web apps.
-redirect_uri=urn:ietf:wg:oauth:2.0:oob
+# Redirect URI for the OAuth2 installed-app flow. Use a local loopback
+# server (Google deprecated the old out-of-band 'urn:ietf:wg:oauth:2.0:oob').
+# Must be registered as an Authorized redirect URI in the Google Cloud
+# OAuth client. Override via the [GoogleOauth2] redirect_uri conf key.
+redirect_uri=http://127.0.0.1:8080
 #identifier and secret in app mode for gmvault
 #NOT hardcoded for security. Set them via environment variables
 #GMVAULT_CLIENT_ID and GMVAULT_CLIENT_SECRET (see credential_utils.py).

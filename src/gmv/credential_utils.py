@@ -24,6 +24,8 @@ import webbrowser
 import json
 import base64
 import requests
+import urllib.parse
+import http.server
 
 import os
 import getpass
@@ -79,6 +81,53 @@ def _post_token_request(params):
         raise Exception("Google oauth2 error: %s %s" % (json_resp["error"], desc))
 
     return json_resp
+
+def _is_loopback(redirect_uri):
+    """Return True if redirect_uri points to a local loopback server."""
+    try:
+        parsed = urllib.parse.urlparse(redirect_uri)
+    except Exception:
+        return False
+    return parsed.scheme in ('http', 'https') and \
+        parsed.hostname in ('127.0.0.1', 'localhost')
+
+def _capture_oauth_code(redirect_uri):
+    """Start a local HTTP server on the loopback redirect URI and block until
+    Google redirects back with the authorization code. Returns the code.
+
+    This replaces the deprecated out-of-band (oob) flow.
+    """
+    parsed = urllib.parse.urlparse(redirect_uri)
+    port = parsed.port or 8080
+    captured = {}
+
+    class _Handler(http.server.BaseHTTPRequestHandler):
+        def do_GET(self):
+            params = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
+            if 'code' in params:
+                captured['code'] = params['code'][0]
+                self.send_response(200)
+                self.send_header('Content-Type', 'text/html')
+                self.end_headers()
+                self.wfile.write(b"<html><body>Authorization complete. You can close "
+                                 b"this window and return to gmvault.</body></html>")
+            elif 'error' in params:
+                captured['error'] = params['error'][0]
+                self.send_response(400)
+                self.end_headers()
+            else:
+                self.send_response(400)
+                self.end_headers()
+
+        def log_message(self, *args):  # silence default logging
+            pass
+
+    server = http.server.HTTPServer(('127.0.0.1', port), _Handler)
+    server.handle_request()  # serves exactly one request then stops
+
+    if 'error' in captured:
+        raise Exception("OAuth2 authorization error: %s" % captured['error'])
+    return captured.get('code')
 
 def generate_permission_url():
   """Generates the URL for authorizing access.
@@ -339,27 +388,33 @@ class CredentialHelper(object):
         #create permission url
         permission_url = generate_permission_url()
 
-        #message to indicate that a browser will be opened
-        eval(input('gmvault will now open a web browser page in order for you to grant gmvault access to your Gmail.\n'\
-                  'Please make sure you\'re logged into the correct Gmail account (%s) before granting access.\n'\
-                  'Press ENTER to open the browser.' % (email)))
+        redirect_uri = gmvault_utils.get_conf_defaults().get("GoogleOauth2",
+                                                            "redirect_uri",
+                                                            'urn:ietf:wg:oauth:2.0:oob')
 
-        # run web browser otherwise print message with url
-        if use_webbrowser:
-            try:
+        # Modern Google flow: the browser redirects back to a local loopback
+        # server that captures the authorization code automatically.
+        if _is_loopback(redirect_uri):
+            LOG.critical("Opening your browser to authorize gmvault access to Gmail (%s)..." % (email))
+            if use_webbrowser:
                 webbrowser.open(str(permission_url))
-            except Exception as err: #pylint: disable-msg=W0703
-                LOG.critical("Error: %s.\n" % (err) )
-                LOG.critical("=== Exception traceback ===")
-                LOG.critical(gmvault_utils.get_exception_traceback())
-                LOG.critical("=== End of Exception traceback ===\n")
-
-            verification_code = eval(input("You should now see the web page on your browser now.\n"\
-                      "If you don\'t, you can manually open:\n\n%s\n\nOnce you've granted"\
-                      " gmvault access, enter the verification code and press enter:\n" % (permission_url)))
+            else:
+                LOG.critical("Open this URL in your browser:\n%s" % permission_url)
+            LOG.critical("Waiting for the authorization code from Google...")
+            verification_code = _capture_oauth_code(redirect_uri)
         else:
-            verification_code = eval(input('Please log in and/or grant access via your browser at %s '
-                      'then enter the verification code and press enter:' % (permission_url)))
+            # Legacy out-of-band flow (deprecated by Google).
+            input('gmvault will now open a web browser page in order for you to grant '
+                  'gmvault access to your Gmail.\nPlease make sure you\'re logged into '
+                  'the correct Gmail account (%s) before granting access.\n'
+                  'Press ENTER to open the browser.' % (email))
+            if use_webbrowser:
+                try:
+                    webbrowser.open(str(permission_url))
+                except Exception as err:  #pylint: disable-msg=W0703
+                    LOG.critical("Error: %s.\n" % (err))
+            verification_code = input("Once you've granted gmvault access, enter the "
+                                       "verification code and press enter:\n")
 
         #request access and refresh token with the obtained verification code
         response = cls._get_authorization_tokens(verification_code)
@@ -383,9 +438,9 @@ class CredentialHelper(object):
         Returns:
         The SASL argument for the OAuth2 mechanism.
         """
-        auth_string = 'user=%s\1auth=Bearer %s\1\1' % (username, access_token)
+        auth_string = 'user=%s\x01auth=Bearer %s\x01\x01' % (username, access_token)
         if base64_encode:
-            auth_string = base64.b64encode(auth_string)
+            auth_string = base64.b64encode(auth_string.encode('utf-8'))
         return auth_string
 
     @classmethod

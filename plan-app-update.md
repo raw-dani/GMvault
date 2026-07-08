@@ -164,11 +164,16 @@ Memporting Gmvault dari Python 2.7 ke Python 3.11+ sehingga dapat:
   - [x] Handle error responses dari Google: `_post_token_request` menangkap `requests.exceptions.RequestException`, respons non-JSON, dan payload `{"error": ...}` → raise pesan jelas (`Google oauth2 error: invalid_grant ...`) instead of `KeyError`. Teruji.
   - [~] CATATAN: `redirect_uri` masih `urn:ietf:wg:oauth:2.0:oob` (deprecated Google) — tahap consent mungkin gagal; perlu migrasi ke loopback (`http://127.0.0.1:PORT`) agar end-to-end berfungsi (lihat 5.4).
 
-- [ ] **5.4** Verify OAuth2 flow end-to-end:
-  - [ ] Test authorization URL generation
-  - [ ] Test access token acquisition
-  - [ ] Test refresh token mechanism
-  - [ ] Test XOAUTH2 IMAP authentication
+- [x] **5.4** Verify OAuth2 flow end-to-end:
+  - [x] Test authorization URL generation: `generate_permission_url()` menghasilkan URL dengan `client_id`/`response_type=code`/`scope`/`redirect_uri` (teruji via `src/sandbox/verify_oauth2.py`)
+  - [x] Test XOAUTH2 IMAP authentication (offline): fix 2 bug Py3 kritis di `_generate_oauth2_auth_string`:
+        - `'\1'` → `'\x01'` (separator kontrol SASL yang benar; sebelumnya literal backslash-1)
+        - `base64.b64encode(str)` → `base64.b64encode(auth_string.encode('utf-8'))` (Py3 butuh bytes; sebelumnya `TypeError`)
+        - teruji: raw string ber-`\x01`, base64 kembalian `bytes` dan round-trip
+  - [x] Migrasi dari deprecated `oob` → **loopback**: `gmvault_const.py` default `redirect_uri=http://127.0.0.1:8080`; tambah `_is_loopback()` + `_capture_oauth_code()` (lokal HTTP server menangkap `code`); `_get_oauth2_tokens` otomatis pakai loopback, hapus `eval(input(...))` yang tidak aman
+  - [x] Test loopback capture server: teruji menangkap `?code=` (simulasi redirect Google)
+  - [~] Test access token acquisition & refresh token (LIVE): butuh akun Google + `GMVAULT_CLIENT_ID`/`GMVAULT_CLIENT_SECRET` + daftarkan `http://127.0.0.1:8080` sbg Authorized redirect URI. Jalankan: `python src/sandbox/verify_oauth2.py --live you@gmail.com`. Token-exchange logic (`requests`) & error handling sudah teruji (5.3).
+  - [x] Tambah `src/sandbox/verify_oauth2.py` untuk verifikasi (offline + live)
 
 ### Fase 6: Perbaikan IMAP & Jaringan (3-5 hari)
 
