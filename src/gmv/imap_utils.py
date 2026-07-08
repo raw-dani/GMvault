@@ -23,6 +23,7 @@ import math
 import time
 import socket
 import re
+import codecs
 
 import functools
 
@@ -908,8 +909,8 @@ def decode_labels(labels):
 # utf7 conversion functions
 def utf7_encode(s): #pylint: disable=C0103
     """encode in utf7"""
-    if isinstance(s, str) and sum(n for n in (ord(c) for c in s) if n > 127):
-        raise ValueError("%r contains characters not valid in a str folder name. "
+    if isinstance(s, bytes):
+        raise ValueError("%r is bytes, not a str folder name. "
                               "Convert to unicode first?" % s)
 
     r = [] #pylint: disable=C0103
@@ -961,11 +962,11 @@ def utf7_decode(s): #pylint: disable=C0103
 def utf7_modified_base64(s): #pylint: disable=C0103
     """utf7 base64"""
     s_utf7 = s.encode('utf-7')
-    return s_utf7[1:-1].replace('/', ',')
+    return s_utf7[1:-1].replace(b'/', b',').decode('ascii')
 
 
 def utf7_modified_unbase64(s): #pylint: disable=C0103
     """ utf7 unbase64"""
     s_utf7 = '+' + s.replace(',', '/') + '-'
-    return s_utf7.decode('utf-7')
+    return codecs.decode(s_utf7.encode('ascii'), 'utf-7')
 

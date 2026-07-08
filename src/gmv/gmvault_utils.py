@@ -503,7 +503,7 @@ def guess_encoding(byte_str, use_encoding_list=True):
     """
     encoding = None
 
-    if type(byte_str) == type(str()):
+    if isinstance(byte_str, str):
        raise GuessEncoding("Error. The passed string is a unicode string and not a byte string")
 
     if use_encoding_list:
@@ -563,7 +563,7 @@ def convert_argv_to_unicode(a_str):
        Convert command line individual arguments (argv to unicode)
     """
     #if str is already unicode do nothing and return the str
-    if type(a_str) == type(str()):
+    if isinstance(a_str, str):
         return a_str
 
     #encoding can be forced from conf

@@ -97,11 +97,15 @@ Memporting Gmvault dari Python 2.7 ke Python 3.11+ sehingga dapat:
 ### Fase 4: Perubahan Inti Python 2 → 3 (5-7 hari)
 
 #### 4.1 String & Encoding
-- [ ] Ganti semua `unicode()` → `str()`
-- [ ] Ganti `basestring` → `str`
-- [ ] Perbaiki encoding/decoding di `gmvault_utils.py`
-- [ ] Update fungsi `convert_to_unicode()`, `guess_encoding()`, `convert_argv_to_unicode()`
-- [ ] Update fungsi `utf7_encode`/`utf7_decode` di `imap_utils.py`
+- [x] Ganti semua `unicode()` → `str()` (sudah otomatis oleh 2to3 di Fase 2; tidak ada `unicode()` tersisa di kode)
+- [x] Ganti `basestring` → `str` (tidak ada referensi `basestring` tersisa)
+- [x] Perbaiki encoding/decoding di `gmvault_utils.py`: modernisasi guard `type(x) == type(str())` → `isinstance(x, str)` (guess_encoding:506, convert_argv_to_unicode:566)
+- [x] Update fungsi `convert_to_unicode()`, `guess_encoding()`, `convert_argv_to_unicode()`: sudah benar setelah 2to3 (`str(bytes, enc)` = decode di Py3); teruji dengan input bytes
+- [x] Update fungsi `utf7_encode`/`utf7_decode` di `imap_utils.py`:
+  - [x] `utf7_modified_base64`: hasil `.encode('utf-7')` (bytes di Py3) di-decode kembali ke `str` agar `''.join` tidak gagal
+  - [x] `utf7_modified_unbase64`: gunakan `codecs.decode(s.encode('ascii'), 'utf-7')` (str tidak punya `.decode()` di Py3)
+  - [x] `utf7_encode`: guard diubah — tolak input `bytes`, izinkan `str` non-ASCII (itu yang memang di-encode)
+  - [x] Round-trip ASCII & non-ASCII (Café, Répertoire, Boîte de réception) teruji `PASS`
 
 #### 4.2 I/O & Files
 - [ ] Ganti `StringIO.StringIO` → `io.StringIO`
