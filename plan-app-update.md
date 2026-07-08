@@ -147,11 +147,12 @@ Memporting Gmvault dari Python 2.7 ke Python 3.11+ sehingga dapat:
 
 ### Fase 5: Perbaikan Autentikasi OAuth2 (3-4 hari)
 
-- [ ] **5.1** Register aplikasi baru di Google Cloud Console:
+- [ ] **5.1** Register aplikasi baru di Google Cloud Console **(MANUAL — dilakukan user)**:
   - [ ] Buat project baru
   - [ ] Enable Gmail API
   - [ ] Buat OAuth 2.0 Client ID (Desktop application)
   - [ ] Catat Client ID dan Client Secret baru
+  - [x] Infra kode sudah siap (approach **env var**): kredensial dibaca dari `GMVAULT_CLIENT_ID` / `GMVAULT_CLIENT_SECRET` (`credential_utils.py`: `get_oauth2_credentials()`/`get_oauth2_client_id()`/`get_oauth2_client_secret()`), hardcoded credential dihapus dari `gmvault_const.py:80-81` dan fallback di `credential_utils.py` (254-255, 295-296)
   
 - [ ] **5.2** Update hardcoded credentials di `gmvault_const.py`:
   - [ ] Ganti `1070918343777-...` dengan Client ID baru
