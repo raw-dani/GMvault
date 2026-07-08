@@ -1,0 +1,83 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.backends._legacy:_Backend"
+
+[project]
+name = "gmvault"
+version = "2.0.0-dev"
+description = "Tool to backup and restore your Gmail emails at will"
+readme = "README.md"
+license = {text = "AGPL-3.0"}
+requires-python = ">=3.9"
+keywords = ["gmail", "email", "backup", "gmail backup", "imap"]
+authors = [
+    {name = "Guillaume Aubert", email = "guillaume.aubert@gmail.com"},
+]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "License :: OSI Approved :: GNU Affero General Public License v3",
+    "Topic :: Communications :: Email",
+    "Topic :: Communications :: Email :: Post-Office :: IMAP",
+    "Environment :: Console",
+]
+dependencies = [
+    "imapclient>=3.0.0,<4.0.0",
+    "chardet>=5.0.0,<6.0.0",
+    "requests>=2.28.0,<3.0.0",
+    "cryptography>=41.0.0,<42.0.0",
+    "loguru>=0.7.0,<1.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0",
+    "pytest-cov>=4.0",
+    "flake8>=6.0",
+    "black>=23.0",
+    "mypy>=1.0",
+    "pre-commit>=3.0",
+]
+
+[project.urls]
+Homepage = "http://www.gmvault.org"
+Source = "https://github.com/gaubert/gmvault"
+
+[project.scripts]
+gmvault = "gmv.gmv_cmd:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["gmv*"]
+
+[tool.setuptools.package-data]
+"gmv" = ["*.conf"]
+
+[tool.pytest.ini_options]
+testpaths = ["src"]
+python_files = ["*_tests.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+
+[tool.black]
+line-length = 120
+target-version = ["py39", "py310", "py311"]
+
+[tool.flake8]
+max-line-length = 120
+extend-ignore = ["E402", "E501", "W503"]
+exclude = [".git", "__pycache__", "venv", "build", "dist"]
+
+[tool.mypy]
+python_version = "3.11"
+ignore_missing_imports = true
+warn_unused_ignores = true
+strict_optional = true
+exclude = ["venv", "build", "dist"]
+
+[tool.coverage.run]
+source = ["src/gmv"]
+omit = ["*_tests.py", "*/tests/*"]
