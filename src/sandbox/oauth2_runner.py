@@ -205,7 +205,10 @@ def AuthorizeTokens(client_id, client_secret, authorization_code):
   params['grant_type'] = 'authorization_code'
   request_url = AccountsUrl('o/oauth2/token')
 
-  response = urllib.request.urlopen(request_url, urllib.parse.urlencode(params)).read()
+  data = urllib.parse.urlencode(params).encode('utf-8')
+  request = urllib.request.Request(request_url, data=data,
+                                   headers={'Content-Type': 'application/x-www-form-urlencoded'})
+  response = urllib.request.urlopen(request).read()
   return json.loads(response)
 
 
@@ -229,7 +232,10 @@ def RefreshToken(client_id, client_secret, refresh_token):
   params['grant_type'] = 'refresh_token'
   request_url = AccountsUrl('o/oauth2/token')
 
-  response = urllib.request.urlopen(request_url, urllib.parse.urlencode(params)).read()
+  data = urllib.parse.urlencode(params).encode('utf-8')
+  request = urllib.request.Request(request_url, data=data,
+                                   headers={'Content-Type': 'application/x-www-form-urlencoded'})
+  response = urllib.request.urlopen(request).read()
   return json.loads(response)
 
 

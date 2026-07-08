@@ -127,11 +127,12 @@ Memporting Gmvault dari Python 2.7 ke Python 3.11+ sehingga dapat:
 - [x] Update `cmp_to_key` → `functools.cmp_to_key`: hapus redefinisi lokal di `gmvault_utils.py` (line 303), impor `from functools import cmp_to_key`; `get_all_dirs_posterior_to` teruji `PASS`
 
 #### 4.4 Network & HTTP
-- [ ] Ganti `urllib2` → `urllib.request` + `urllib.error`
-- [ ] Ganti `urllib.urlencode` → `urllib.parse.urlencode`
-- [ ] Ganti `urllib.quote` → `urllib.parse.quote`
-- [ ] Update `credential_utils.py` untuk HTTP requests
-- [ ] Update `gmvault_utils.py` untuk URL handling
+- [x] Ganti `urllib2` → `urllib.request` + `urllib.error` (sudah otomatis 2to3; import di `credential_utils.py`, `gmvault_utils.py`, `oauth2*.py` sudah benar)
+- [x] Ganti `urllib.urlencode` → `urllib.parse.urlencode` (sudah otomatis 2to3)
+- [x] Ganti `urllib.quote` → `urllib.parse.quote` (`gmvault_utils.py`, `oauth2.py`, `oauth2_runner.py` sudah benar)
+- [x] Update `credential_utils.py` untuk HTTP requests: fix bug Py3 pada `urlopen` — data POST harus `bytes` + header `Content-Type: application/x-www-form-urlencoded` (pakai `urllib.request.Request`). Diterapkan di `_get_oauth2_acc_tok_from_ref_tok` & `_get_authorization_tokens`
+- [x] Update `gmvault_utils.py` untuk URL handling: `escape_url`/`unescape_url` sudah pakai `urllib.parse.quote`/`unquote` (teruji round-trip)
+- [x] Sama untuk sandbox `oauth2.py` & `oauth2_runner.py` (pola `urlopen(url, urlencode(params))` → `Request` dengan bytes data)
 
 #### 4.5 Miscellaneous
 - [ ] Ganti `raw_input()` → `input()`
