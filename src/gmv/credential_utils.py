@@ -23,8 +23,7 @@
 import webbrowser
 import json
 import base64
-import urllib.request, urllib.parse, urllib.error #for urlencode
-import urllib.request, urllib.error, urllib.parse
+import requests
 
 import os
 import getpass
@@ -53,6 +52,33 @@ def get_oauth2_credentials():
         raise Exception("OAuth2 Client ID/Secret not configured. Set the environment "
                         "variables GMVAULT_CLIENT_ID and GMVAULT_CLIENT_SECRET.")
     return client_id, client_secret
+
+def _post_token_request(params):
+    """POST to Google's OAuth2 token endpoint and return the parsed JSON response.
+
+    Raises a clear exception on network failure, invalid response, or when
+    Google returns an error payload (e.g. invalid_grant / invalid_client).
+    """
+    account_base_url = gmvault_utils.get_conf_defaults().get(
+        "GoogleOauth2", "google_accounts_base_url", "https://accounts.google.com")
+    token_url = "%s/o/oauth2/token" % account_base_url
+    try:
+        resp = requests.post(token_url, data=params, timeout=30)
+    except requests.exceptions.RequestException as err:
+        raise Exception("Error connecting to Google oauth2 token endpoint %s: %s"
+                        % (token_url, err))
+
+    try:
+        json_resp = resp.json()
+    except ValueError:
+        raise Exception("Invalid (non-JSON) response from Google oauth2 endpoint: %r"
+                        % resp.text)
+
+    if "error" in json_resp:
+        desc = json_resp.get("error_description", "")
+        raise Exception("Google oauth2 error: %s %s" % (json_resp["error"], desc))
+
+    return json_resp
 
 def generate_permission_url():
   """Generates the URL for authorizing access.
@@ -274,20 +300,7 @@ class CredentialHelper(object):
       params['refresh_token'] = refresh_token
       params['grant_type'] = 'refresh_token'
 
-      account_base_url = gmvault_utils.get_conf_defaults().get("GoogleOauth2", "google_accounts_base_url", 'https://accounts.google.com')
-
-      request_url = '%s/%s' % (account_base_url, 'o/oauth2/token')
-
-      try:
-        data = urllib.parse.urlencode(params).encode('utf-8')
-        request = urllib.request.Request(request_url, data=data,
-                                         headers={'Content-Type': 'application/x-www-form-urlencoded'})
-        response = urllib.request.urlopen(request).read()
-      except Exception as err: #pylint: disable-msg=W0703
-        LOG.critical("Error: Problems when trying to connect to Google oauth2 endpoint: %s.\n" % (request_url))
-        raise err
-
-      json_resp = json.loads(response)
+      json_resp = _post_token_request(params)
 
       LOG.debug("json_resp = %s" % (json_resp))
 
@@ -315,20 +328,7 @@ class CredentialHelper(object):
         params['redirect_uri'] = gmvault_utils.get_conf_defaults().get("GoogleOauth2", "redirect_uri", 'urn:ietf:wg:oauth:2.0:oob')
         params['grant_type'] = 'authorization_code'
 
-        account_base_url = gmvault_utils.get_conf_defaults().get("GoogleOauth2", "google_accounts_base_url", 'https://accounts.google.com')
-
-        request_url = '%s/%s' % (account_base_url, 'o/oauth2/token')
-
-        data = urllib.parse.urlencode(params).encode('utf-8')
-        request = urllib.request.Request(request_url, data=data,
-                                         headers={'Content-Type': 'application/x-www-form-urlencoded'})
-        try:
-            response = urllib.request.urlopen(request).read()
-        except Exception as err: #pylint: disable-msg=W0703
-            LOG.critical("Error: Problems when trying to connect to Google oauth2 endpoint: %s." % (request_url))
-            raise err
-
-        return json.loads(response)
+        return _post_token_request(params)
 
     @classmethod
     def _get_oauth2_tokens(cls, email, use_webbrowser = False, debug=False):

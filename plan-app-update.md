@@ -158,10 +158,11 @@ Memporting Gmvault dari Python 2.7 ke Python 3.11+ sehingga dapat:
   - [ ] Ganti `1070918343777-...` dengan Client ID baru
   - [ ] Ganti `IVkl_pglv5cX...` dengan Client Secret baru
   
-- [ ] **5.3** Update `credential_utils.py`:
-  - [ ] Ganti `urllib2` → `requests` library (rekomendasi)
-  - [ ] Update OAuth2 token refresh flow
-  - [ ] Handle error responses dari Google yang lebih baik
+- [x] **5.3** Update `credential_utils.py`:
+  - [x] Ganti `urllib2` → `requests` library: `urllib2` sudah tidak ada di core (0 occ, dikonversi 2to3 + fix 4.4); token-exchange `_get_oauth2_acc_tok_from_ref_tok` & `_get_authorization_tokens` ditulis ulang pakai `requests.post` (import `requests` ditambah, import `urllib` yang tak terpakai dibuang)
+  - [x] Update OAuth2 token refresh flow: logika `refresh_token` grant dipertahankan, dipusatkan ke helper `_post_token_request(params)`
+  - [x] Handle error responses dari Google: `_post_token_request` menangkap `requests.exceptions.RequestException`, respons non-JSON, dan payload `{"error": ...}` → raise pesan jelas (`Google oauth2 error: invalid_grant ...`) instead of `KeyError`. Teruji.
+  - [~] CATATAN: `redirect_uri` masih `urn:ietf:wg:oauth:2.0:oob` (deprecated Google) — tahap consent mungkin gagal; perlu migrasi ke loopback (`http://127.0.0.1:PORT`) agar end-to-end berfungsi (lihat 5.4).
 
 - [ ] **5.4** Verify OAuth2 flow end-to-end:
   - [ ] Test authorization URL generation
