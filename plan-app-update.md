@@ -108,10 +108,15 @@ Memporting Gmvault dari Python 2.7 ke Python 3.11+ sehingga dapat:
   - [x] Round-trip ASCII & non-ASCII (Café, Répertoire, Boîte de réception) teruji `PASS`
 
 #### 4.2 I/O & Files
-- [ ] Ganti `StringIO.StringIO` → `io.StringIO`
-- [ ] Ganti `cStringIO.StringIO` → `io.BytesIO`
-- [ ] Update `os.tempnam` → `tempfile` modul
-- [ ] Update semua file operations yang menggunakan bytes vs string
+- [x] Ganti `StringIO.StringIO` → `io.StringIO` (sudah otomatis oleh 2to3; tersisa hanya di komentar)
+- [x] Ganti `cStringIO.StringIO` → `io.BytesIO`:
+  - [x] `mod_imap.py` (read/new_read/readline): socket membaca `bytes` → `io.StringIO` diganti `io.BytesIO` agar `chunks.write(bytes)` & `getvalue()` tidak gagal
+  - [x] `readline`: fix comparasi `char in ("\n","")` → `char in (b"\n", b"")` (bytes vs str, hindari infinite loop)
+- [x] `os.tempnam` → `tempfile`: tidak ada pemakaian `os.tempnam` di source (tidak perlu diubah)
+- [x] Update file operations bytes vs string:
+  - [x] `gmvault_db.py` `_get_data_file_from_id`: data file dibuka `'rb'` (gzip & plain) agar `decryptCTR(f.read())` & konten email kembali sebagai `bytes` (konsisten dg write path `'wb'`)
+  - [x] `io.StringIO` di `gmvault_utils.py` (traceback buffer) & `struct_parser.py` (tokenizer) sudah benar menampung `str` → tidak diubah
+  - [x] Komentar `StringIO.StringIO` di `gmvault_db.py` diperbarui ke `io.BytesIO()`
 
 #### 4.3 Collections & Iteration
 - [ ] Ganti `dict.iteritems()` → `dict.items()`

@@ -154,7 +154,7 @@ class IMAP4COMPSSL(imaplib.IMAP4_SSL): #pylint:disable=R0904
             Call _intern_read that takes care of the compression
         """
         
-        chunks = io.StringIO() #use cStringIO.cStringIO to avoir too much fragmentation
+        chunks = io.BytesIO() #use BytesIO to hold socket bytes (avoid too much fragmentation)
         read = 0
         while read < size:
             try:
@@ -165,7 +165,7 @@ class IMAP4COMPSSL(imaplib.IMAP4_SSL): #pylint:disable=R0904
             read += len(data)
             chunks.write(data)
         
-        return chunks.getvalue() #return the cStringIO content
+        return chunks.getvalue() #return the BytesIO content
     
     def read(self, size):
         """
@@ -173,7 +173,7 @@ class IMAP4COMPSSL(imaplib.IMAP4_SSL): #pylint:disable=R0904
             Call _intern_read that takes care of the compression
         """
         
-        chunks = io.StringIO() #use cStringIO.cStringIO to avoir too much fragmentation
+        chunks = io.BytesIO() #use BytesIO to hold socket bytes (avoid too much fragmentation)
         read = 0
         while read < size:
             data = self._intern_read(min(size-read, 16384)) #never ask more than 16384 because imaplib can do it
@@ -183,7 +183,7 @@ class IMAP4COMPSSL(imaplib.IMAP4_SSL): #pylint:disable=R0904
             read += len(data)
             chunks.write(data)
         
-        return chunks.getvalue() #return the cStringIO content
+        return chunks.getvalue() #return the BytesIO content
   
     def _intern_read(self, size):
         """
@@ -202,13 +202,13 @@ class IMAP4COMPSSL(imaplib.IMAP4_SSL): #pylint:disable=R0904
         
     def readline(self):
         """Read line from remote."""
-        line = io.StringIO() #use cStringIO to avoid memory fragmentation
+        line = io.BytesIO() #use BytesIO to hold socket bytes (avoid memory fragmentation)
         while 1:
             #make use of read that takes care of the compression
             #it could be simplified without compression
             char = self.read(1) 
             line.write(char)
-            if char in ("\n", ""): 
+            if char in (b"\n", b""): 
                 return line.getvalue()
     
     def shutdown(self):

@@ -444,7 +444,7 @@ class GmailStorer(object): #pylint:disable=R0902,R0904,R0914
 
         #if compress:
         #   data_path = '%s.gz' % data_path
-        #   data_desc = StringIO.StringIO()
+        #   data_desc = io.BytesIO()
         #else:
         #    data_desc = open(data_path, 'wb')
 
@@ -528,13 +528,13 @@ class GmailStorer(object): #pylint:disable=R0902,R0904,R0914
 
         # check if encrypted and compressed or not
         if os.path.exists('%s.crypt.gz' % data_p):
-            f = gzip.open('%s.crypt.gz' % data_p, 'r')
+            f = gzip.open('%s.crypt.gz' % data_p, 'rb')
         elif os.path.exists('%s.gz' % data_p):
-            f = gzip.open('%s.gz' % data_p, 'r')
+            f = gzip.open('%s.gz' % data_p, 'rb')
         elif os.path.exists('%s.crypt' % data_p):
-            f = open('%s.crypt' % data_p, 'r')
+            f = open('%s.crypt' % data_p, 'rb')
         else:
-            f = open(data_p)
+            f = open(data_p, 'rb')
 
         try:
             yield f
