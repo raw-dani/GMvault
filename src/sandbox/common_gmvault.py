@@ -300,7 +300,7 @@ class IMAPBatchFetcher(object):
         if data == [None]: # no untagged responses...
             return [ ]
 
-        return [ long(i) for i in data[0].split() ]
+        return [ int(i) for i in data[0].split() ]
     
     def append(self, folder, msg, flags=(), msg_time=None):
         """Append a message to *folder*.

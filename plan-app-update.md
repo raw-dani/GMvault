@@ -61,15 +61,17 @@ Memporting Gmvault dari Python 2.7 ke Python 3.11+ sehingga dapat:
 
 ### Fase 2: Automated Porting dengan 2to3 (2-3 hari)
 
-- [ ] **2.1** Jalankan `2to3` pada seluruh source di `src/`
-- [ ] **2.2** Jalankan `2to3` pada file-file test
-- [ ] **2.3** Review dan fix hasil konversi otomatis
-- [ ] **2.4** Fix manual syntax yang tidak tertangani `2to3`:
-  - `except Exception, e:` → `except Exception as e:`
-  - `raise Exception, "msg"` → `raise Exception("msg")`
-  - `print >> sys.stderr, x` → `print(x, file=sys.stderr)`
-  - `backtick` syntax `` `x` `` → `repr(x)`
-- [ ] **2.5** Verify tidak ada syntax error (`python -m py_compile`)
+- [x] **2.1** Jalankan `2to3` pada seluruh source di `src/` (45 file)
+- [x] **2.2** Jalankan `2to3` pada file-file test
+- [x] **2.3** Review dan fix hasil konversi otomatis
+- [x] **2.4** Fix manual syntax yang tidak tertangani `2to3`:
+  - `except Exception, e:` → `except Exception as e:` (tidak ditemukan, sudah bersih)
+  - `raise Exception, "msg"` → `raise Exception("msg")` (tidak ditemukan)
+  - `print >> sys.stderr, x` → `print(x, file=sys.stderr)` (tidak ditemukan)
+  - `backtick` syntax `` `x` `` → `repr(x)` (hanya di docstring, aman)
+  - Fix `TabError`/`IndentationError` di `src/sandbox/unicode_test.py`
+  - Fix `long()` → `int()` di `src/sandbox/common_gmvault.py`
+- [x] **2.5** Verify tidak ada syntax error (`python -m py_compile` → semua lolos)
 
 ### Fase 3: Update Dependencies (3-5 hari)
 
