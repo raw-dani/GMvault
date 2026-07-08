@@ -135,14 +135,15 @@ Memporting Gmvault dari Python 2.7 ke Python 3.11+ sehingga dapat:
 - [x] Sama untuk sandbox `oauth2.py` & `oauth2_runner.py` (pola `urlopen(url, urlencode(params))` → `Request` dengan bytes data)
 
 #### 4.5 Miscellaneous
-- [ ] Ganti `raw_input()` → `input()`
-- [ ] Ganti `long` type → `int`
-- [ ] Update `__getslice__` → `__getitem__`
-- [ ] Update `has_key()` → `in` operator
-- [ ] Update `sort` dengan `cmp` → `sort` dengan `key` atau `functools.cmp_to_key`
-- [ ] Fix `map()` yang mengembalikan iterator (bukan list)
-- [ ] Fix `filter()` yang mengembalikan iterator (bukan list)
-- [ ] Update semua `type()` comparison (misal `type(a) == type(b)`)
+- [x] Ganti `raw_input()` → `input()` (sudah otomatis 2to3; tidak ada `raw_input` tersisa)
+- [x] Ganti `long` type → `int` (sudah otomatis 2to3; tidak ada `long(` tersisa — termasuk `sandbox/common_gmvault.py`)
+- [x] Update `__getslice__` → `__getitem__` (tidak ada penggunaan `__getslice__` di source)
+- [x] Update `has_key()` → `in` operator (tidak ada `.has_key(` tersisa)
+- [x] Update `sort` dengan `cmp` → `sort` dengan `key`/`cmp_to_key` (tidak ada `.sort(cmp=...)` tersisa)
+- [x] Fix `map()` iterator: 3 pemakaian (`collections_utils.py:76`, `imap_utils.py:652`, `gmvault_db.py:519`) semuanya di-feed ke `join()`/`fnmatch.filter()` yang menerima iterable → tidak perlu `list()`
+- [x] Fix `filter()` iterator: hanya `fnmatch.filter()` (mengembalikan list) → aman
+- [x] Update `type()` comparison: tidak ada `type(a) == type(b)` di kode inti; satu-satunya di `sandbox/unicode_test.py:14` (`type(a_str) != type('a')`) sudah benar secara semantik di Py3 (ekuivalen `isinstance(a_str, str)`)
+- [x] Negative scan komprehensif: tidak ada idiom Py2 (raw_input/long/__getslice__/has_key__/xrange/unicode()/sort cmp) tersisa; `compileall` lolos (exit 0)
 
 ### Fase 5: Perbaikan Autentikasi OAuth2 (3-4 hari)
 
