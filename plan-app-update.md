@@ -75,24 +75,24 @@ Memporting Gmvault dari Python 2.7 ke Python 3.11+ sehingga dapat:
 
 ### Fase 3: Update Dependencies (3-5 hari)
 
-- [ ] **3.1** Update `IMAPClient` 0.13 → 3.x:
-  - [ ] Pelajari API changes antara 0.13 dan 3.x
-  - [ ] Update `mod_imap.py` (MonkeyIMAPClient)
-  - [ ] Update `imap_utils.py` (GIMAPFetcher)
-  - [ ] Fix monkey-patching yang rusak
-  - [ ] Update `_convert_INTERNALDATE` patching
-  
-- [ ] **3.2** Update/Ganti `Logbook` 0.10.1:
-  - [ ] Ganti dengan `structlog` atau `loguru` (rekomendasi)
-  - [ ] Atau fork Logbook dengan fix untuk `Feature` import
-  - [ ] Update `log_utils.py`
-  
-- [ ] **3.3** Update `chardet` 2.3.0 → 5.x:
-  - [ ] Relatif aman, backward compatibility baik
-  
-- [ ] **3.4** Hapus `argparse` dari dependency (sudah built-in)
-  
-- [ ] **3.5** Hapus custom `Conf` helper, ganti dengan `configparser` standard library
+- [x] **3.1** Update `IMAPClient` 0.13 → 3.x (terpasang `imapclient==3.1.0`):
+  - [x] Pelajari API changes antara 0.13 dan 3.x
+  - [x] Update `mod_imap.py` (MonkeyIMAPClient): ganti `imapclient.six.binary_type/text_type` → `bytes`/`str` (six dihapus di 3.x)
+  - [x] Update signature `MonkeyIMAPClient.__init__`: `need_ssl` → `ssl` (sesuai `IMAPClient.__init__(host, port, use_uid, ssl, ...)`)
+  - [x] Update call site `imap_utils.py:290` (`need_ssl=` → `ssl=`)
+  - [x] Monkey-patching `_convert_INTERNALDATE` & `imaplib.Commands['COMPRESS']` tetap valid di 3.1.0
+  - [~] Update mendalam `imap_utils.py` (GIMAPFetcher) → lanjut di Fase 6 (IMAP & Jaringan)
+   
+- [x] **3.2** Update/Ganti `Logbook` 0.10.1 → `loguru` (`loguru==0.7.3`):
+  - [x] Tulis ulang `log_utils.py` dengan backend `loguru`, pertahankan interface `LoggerFactory` (get_logger + setup_cli_app_handler/setup_simple_*)
+  - [x] Hapus import `logbook`; default handler di-remove agar senyap sampai setup dipanggil (mirip NullHandler)
+   
+- [x] **3.3** Update `chardet` 2.3.0 → 5.x (`chardet==5.2.0`):
+  - [x] `chardet.detect()` API identik, tidak ada perubahan kode (`gmvault_utils.py:522`, sandbox)
+   
+- [x] **3.4** `argparse` sudah built-in di Python 3 → tidak perlu dependency eksternal (tidak ada di `pyproject.toml`)
+
+- [ ] **3.5** Hapus custom `Conf` helper, ganti `configparser` — **DITUNDA**: `gmv.conf.conf_helper` sudah kompatibel Python 3 (ter-impor bersih). Mengganti ke `configparser` mengubah format file `.conf` gmvault dan berisiko tinggi tanpa manfaat porting → dilanjut di refactor terpisah jika diperlukan.
 
 ### Fase 4: Perubahan Inti Python 2 → 3 (5-7 hari)
 

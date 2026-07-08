@@ -93,12 +93,12 @@ def datetime_to_imap(dt):
     return dt.strftime("%d-%b-%Y %H:%M:%S %z")
 
 def to_unicode(s):
-    if isinstance(s, imapclient.six.binary_type):
+    if isinstance(s, bytes):
         return s.decode('ascii')
     return s
 
 def to_bytes(s):
-    if isinstance(s, imapclient.six.text_type):
+    if isinstance(s, str):
         return s.encode('ascii')
     return s
 
@@ -241,11 +241,11 @@ class MonkeyIMAPClient(imapclient.IMAPClient): #pylint:disable=R0903,R0904
        Compression inspired by http://www.janeelix.com/piers/python/py2html.cgi/piers/python/imaplib2
     """
     
-    def __init__(self, host, port=None, use_uid=True, need_ssl=False):
+    def __init__(self, host, port=None, use_uid=True, ssl=False):
         """
            constructor
         """
-        super(MonkeyIMAPClient, self).__init__(host, port, use_uid, need_ssl)
+        super(MonkeyIMAPClient, self).__init__(host, port, use_uid, ssl)
 
     def oauth2_login(self, oauth2_cred):
         """
