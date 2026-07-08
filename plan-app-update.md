@@ -119,12 +119,12 @@ Memporting Gmvault dari Python 2.7 ke Python 3.11+ sehingga dapat:
   - [x] Komentar `StringIO.StringIO` di `gmvault_db.py` diperbarui ke `io.BytesIO()`
 
 #### 4.3 Collections & Iteration
-- [ ] Ganti `dict.iteritems()` → `dict.items()`
-- [ ] Ganti `dict.iterkeys()` → `dict.keys()`
-- [ ] Ganti `itertools.izip_longest` → `itertools.zip_longest`
-- [ ] Ganti `itertools.ifilter` → `builtins.filter`
-- [ ] Ganti `xrange` → `range`
-- [ ] Update `cmp_to_key` → gunakan `functools.cmp_to_key`
+- [x] Ganti `dict.iteritems()` → `dict.items()` (sudah otomatis 2to3; tidak ada sisa di source)
+- [x] Ganti `dict.iterkeys()` → `dict.keys()` (sudah otomatis 2to3; tidak ada sisa di source)
+- [x] Ganti `itertools.izip_longest` → `itertools.zip_longest` (sudah otomatis 2to3; tidak ada sisa)
+- [x] Ganti `itertools.ifilter` → `builtins.filter` (sudah otomatis 2to3; tidak ada sisa)
+- [x] Ganti `xrange` → `range` (sudah otomatis 2to3; tidak ada sisa — termasuk `sandbox/common_gmvault.py`)
+- [x] Update `cmp_to_key` → `functools.cmp_to_key`: hapus redefinisi lokal di `gmvault_utils.py` (line 303), impor `from functools import cmp_to_key`; `get_all_dirs_posterior_to` teruji `PASS`
 
 #### 4.4 Network & HTTP
 - [ ] Ganti `urllib2` → `urllib.request` + `urllib.error`

@@ -25,6 +25,7 @@ import time
 import calendar
 import fnmatch
 import functools
+from functools import cmp_to_key
 
 import io
 import sys
@@ -300,37 +301,12 @@ def compare_yymm_dir(first, second):
     else:
         return -1
     
-def cmp_to_key(mycmp):
-    """
-        Taken from functools. Not in all python versions so had to redefine it
-        Convert a cmp= function into a key= function
-    """
-    class Key(object): #pylint: disable=R0903
-        """Key class"""
-        def __init__(self, obj, *args): #pylint: disable=W0613
-            self.obj = obj
-        def __lt__(self, other):
-            return mycmp(self.obj, other.obj) < 0
-        def __gt__(self, other):
-            return mycmp(self.obj, other.obj) > 0
-        def __eq__(self, other):
-            return mycmp(self.obj, other.obj) == 0
-        def __le__(self, other):
-            return mycmp(self.obj, other.obj) <= 0
-        def __ge__(self, other):
-            return mycmp(self.obj, other.obj) >= 0
-        def __ne__(self, other):
-            return mycmp(self.obj, other.obj) != 0
-        def __hash__(self):
-            raise TypeError('hash not implemented')
-    return Key
-    
 def get_all_dirs_posterior_to(a_dir, dirs):
     """
            get all directories posterior
     """
     #sort the passed dirs list and return all dirs posterior to a_dir
-         
+          
     return [ name for name in sorted(dirs, key=cmp_to_key(compare_yymm_dir))\
              if compare_yymm_dir(a_dir, name) <= 0 ]
 
