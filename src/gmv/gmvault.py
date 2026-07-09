@@ -153,6 +153,25 @@ def handle_sync_imap_error(the_exception, the_id, error_report, src):
     else:
         raise the_exception    
 
+def normalise_gmail_id(gm_id):
+    """
+       Normalise a Gmail message id coming from IMAPClient 3.x.
+
+       In IMAPClient 3.x the ``X-GM-MSGID`` attribute is returned as a
+       ``bytes`` object (e.g. ``b'123456'``) whereas it is a stable numeric
+       identifier. Convert it to an ``int`` so it can be JSON serialised and
+       compared consistently with the ids stored on disk. Already-int or
+       already-str values are returned unchanged.
+    """
+    if isinstance(gm_id, bytes):
+        gm_id = gm_id.decode('ascii')
+    if isinstance(gm_id, str):
+        try:
+            return int(gm_id)
+        except ValueError:
+            return gm_id
+    return gm_id
+
 class IMAPBatchFetcher(object):
     """
        Fetch IMAP data in batch 
@@ -470,7 +489,9 @@ class GMVaulter(object):
                 if new_data.get(the_id, None):
                     LOG.debug("\nProcess imap id %s" % ( the_id ))
                         
-                    gid      = new_data[the_id].get(imap_utils.GIMAPFetcher.GMAIL_ID, None)
+                    gid      = normalise_gmail_id(new_data[the_id].get(imap_utils.GIMAPFetcher.GMAIL_ID, None))
+                    # store the normalised id back so bury_metadata receives an int
+                    new_data[the_id][imap_utils.GIMAPFetcher.GMAIL_ID] = gid
                     eml_date = new_data[the_id].get(imap_utils.GIMAPFetcher.IMAP_INTERNALDATE, None)
 
                     if gid is None or eml_date is None:
@@ -670,10 +691,13 @@ class GMVaulter(object):
                 group_imap_id = [ im_id for im_id in group_imap_id if im_id != None ]
             
             data = self.src.fetch(group_imap_id, imap_utils.GIMAPFetcher.GET_GMAIL_ID)
-            
+
             # syntax for 2.7 set comprehension { data[key][imap_utils.GIMAPFetcher.GMAIL_ID] for key in data }
             # need to create a list for 2.6
-            db_gmail_ids.difference_update([data[key].get(imap_utils.GIMAPFetcher.GMAIL_ID) for key in data if data[key].get(imap_utils.GIMAPFetcher.GMAIL_ID)])
+            # normalise ids (IMAPClient 3.x returns X-GM-MSGID as bytes) so they
+            # compare correctly against the int ids read from the local db
+            db_gmail_ids.difference_update([normalise_gmail_id(data[key].get(imap_utils.GIMAPFetcher.GMAIL_ID)) \
+                                             for key in data if data[key].get(imap_utils.GIMAPFetcher.GMAIL_ID)])
             
             if len(db_gmail_ids) == 0:
                 break
@@ -834,7 +858,7 @@ class GMVaulter(object):
             #          }, the_fd)
 
             json.dump({
-                'last_id': gm_id,
+                'last_id': normalise_gmail_id(gm_id),
             }, f)
 
     def get_gmails_ids_left_to_restore(self, op_type, db_gmail_ids_info):

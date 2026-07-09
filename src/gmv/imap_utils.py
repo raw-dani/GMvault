@@ -1022,12 +1022,18 @@ class GIMAPFetcher(object): #pylint:disable=R0902,R0904
 
 def decode_labels(labels):
     """
-       Decode labels when they are received as utf7 entities or numbers
+       Decode labels when they are received as utf7 entities or numbers.
+
+       In IMAPClient 3.x the X-GM-LABELS response is a tuple of bytes
+       (utf7-modified encoded), so each label is decoded from bytes to a
+       str before being utf7-decoded.
     """
     new_labels = []
     for label in labels:
         if isinstance(label, (int, float, complex)):
-            label = str(label) 
+            label = str(label)
+        elif isinstance(label, bytes):
+            label = label.decode('ascii')
         new_labels.append(utf7_decode(label))
 
     return new_labels
@@ -1081,7 +1087,8 @@ def utf7_decode(s): #pylint: disable=C0103
     out = ''.join(r)
 
     if not isinstance(out, str):
-        out = str(out, 'latin-1')
+        # Python 2 accepted str(bytes, encoding); be explicit for Python 3
+        out = out.decode('latin-1') if isinstance(out, bytes) else str(out)
     return out
 
 

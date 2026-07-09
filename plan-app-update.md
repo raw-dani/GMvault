@@ -199,12 +199,12 @@ Memporting Gmvault dari Python 2.7 ke Python 3.11+ sehingga dapat:
 
 ### Fase 7: Update Gmvault Core (3-4 hari)
 
-- [ ] **7.1** Update `gmvault.py`:
-  - [ ] Fix `GMVaulter` class untuk Python 3
-  - [ ] Update `IMAPBatchFetcher`
-  - [ ] Update sync operations (`_sync_emails`, `_sync_chats`)
-  - [ ] Update restore operations (`restore_emails`, `restore_chats`)
-  - [ ] Update `check_clean_db` dan `_delete_sync`
+- [x] **7.1** Update `gmvault.py`:
+  - [x] Fix `GMVaulter` class untuk Python 3
+  - [x] Update `IMAPBatchFetcher`
+  - [x] Update sync operations (`_sync_emails`, `_sync_chats`)
+  - [x] Update restore operations (`restore_emails`, `restore_chats`)
+  - [x] Update `check_clean_db` dan `_delete_sync`
   
 - [ ] **7.2** Update `gmvault_db.py`:
   - [ ] Fix `GmailStorer` untuk Python 3
