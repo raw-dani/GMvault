@@ -154,18 +154,18 @@ def retry(a_nb_tries=3, a_sleep_time=1, a_backoff=1): #pylint:disable=R0912
                     # problem with this email, put it in quarantine
                     reconnect(args[0], nb_tries, a_nb_tries, err, m_sleep_time)    
                     
-                except socket.error as sock_err:
-                    LOG.debug("error message = %s. traceback:%s" % (sock_err, gmvault_utils.get_exception_traceback()))
+                except ssl.SSLError as ssl_err:
+                    LOG.debug("error message = %s. traceback:%s" % (ssl_err, gmvault_utils.get_exception_traceback()))
                     
                     if nb_tries[0] < a_nb_tries:
                         LOG.critical("Cannot reach the Gmail server. Wait %s second(s) and retrying." % (m_sleep_time[0]))
                     else:
                         LOG.critical("Stop retrying, tried too many times ...")
                         
-                    reconnect(args[0], nb_tries, a_nb_tries, sock_err, m_sleep_time)
+                    reconnect(args[0], nb_tries, a_nb_tries, ssl_err, m_sleep_time)
                 
-                except ssl.SSLError as ssl_err:
-                    LOG.debug("error message = %s. traceback:%s" % (ssl_err, gmvault_utils.get_exception_traceback()))
+                except socket.error as sock_err:
+                    LOG.debug("error message = %s. traceback:%s" % (sock_err, gmvault_utils.get_exception_traceback()))
                     
                     if nb_tries[0] < a_nb_tries:
                         LOG.critical("Cannot reach the Gmail server. Wait %s second(s) and retrying." % (m_sleep_time[0]))
@@ -344,10 +344,13 @@ class GIMAPFetcher(object): #pylint:disable=R0902,R0904
     
     def enable_compression(self):
         """
-           Try to enable the compression
+           Try to enable the compression (RFC 4978 DEFLATE).
+
+           MonkeyIMAPClient.enable_compression() issues COMPRESS DEFLATE and,
+           if the server agrees, activates the DEFLATE stream on the underlying
+           IMAP4COMPSSL socket. No-op if the server does not support it.
         """
-        #self.server.enable_compression()
-        pass
+        self.server.enable_compression()
 
     @retry(3,1,2) # try 3 times to reconnect with a sleep time of 1 sec and a backoff of 2. The fourth time will wait 4 sec
     def find_folder_names(self):
@@ -609,14 +612,14 @@ class GIMAPFetcher(object): #pylint:disable=R0902,R0904
                 low_directory = directory.lower() #get lower case directory but store original label
                 if (low_directory not in existing_folders) and (low_directory not in self.GMAIL_SPECIAL_DIRS_LOWER):
                     try:
-                        if self.server.create_folder(directory) != 'Success':
+                        if mimap.to_unicode(self.server.create_folder(directory)) != 'Success':
                             raise Exception("Cannot create label %s: the directory %s cannot be created." % (lab, directory))
                         else:
                             LOG.debug("============== ####### Created Labels (%s)." % (directory))
                     except imaplib.IMAP4.error as error:
                         #log error in log file if it exists
                         LOG.debug(gmvault_utils.get_exception_traceback())
-                        if str(error).startswith("create failed: '[ALREADYEXISTS] Duplicate folder"):
+                        if str(error).startswith("create failed: [ALREADYEXISTS] Duplicate folder"):
                             LOG.critical("Warning: label %s already exists on Gmail and Gmvault tried to create it."\
                                          " Ignore this issue." % (directory) )
                         else:
@@ -809,14 +812,17 @@ class GIMAPFetcher(object): #pylint:disable=R0902,R0904
               self.reconnect()
               res    = self.server.append(a_folder, a_body, a_flags, a_internal_time)
     
+        # IMAPClient 3.x returns the APPEND response as bytes, normalise to str
+        res_str = mimap.to_unicode(res) if res is not None else None
+
         LOG.debug("Appended data with flags %s and internal time %s. Operation time = %s.\nres = %s\n" \
-                  % (a_flags, a_internal_time, the_timer.elapsed_ms(), res))
+                  % (a_flags, a_internal_time, the_timer.elapsed_ms(), res_str))
         
         # check res otherwise Exception
-        if '(Success)' not in res:
+        if (res_str is None) or ('(Success)' not in res_str):
             raise PushEmailError("GIMAPFetcher cannot restore email in %s account." %(self.login))
         
-        match = GIMAPFetcher.APPENDUID_RE.match(res)
+        match = GIMAPFetcher.APPENDUID_RE.match(res_str) if res_str else None
         if match:
             result_uid = int(match.group(1))
             LOG.debug("result_uid = %s" %(result_uid))
@@ -855,14 +861,17 @@ class GIMAPFetcher(object): #pylint:disable=R0902,R0904
               a_body = self._clean_email_body(a_body)
               res    = self.server.append('[Google Mail]/All Mail', a_body, a_flags, a_internal_time)
     
+        # IMAPClient 3.x returns the APPEND response as bytes, normalise to str
+        res_str = mimap.to_unicode(res) if res is not None else None
+
         LOG.debug("Appended data with flags %s and internal time %s. Operation time = %s.\nres = %s\n" \
-                  % (a_flags, a_internal_time, the_t.elapsed_ms(), res))
+                  % (a_flags, a_internal_time, the_t.elapsed_ms(), res_str))
         
         # check res otherwise Exception
-        if '(Success)' not in res:
+        if (res_str is None) or ('(Success)' not in res_str):
             raise PushEmailError("GIMAPFetcher cannot restore email in %s account." %(self.login))
         
-        match = GIMAPFetcher.APPENDUID_RE.match(res)
+        match = GIMAPFetcher.APPENDUID_RE.match(res_str) if res_str else None
         if match:
             result_uid = int(match.group(1))
             LOG.debug("result_uid = %s" %(result_uid))

@@ -185,12 +185,12 @@ Memporting Gmvault dari Python 2.7 ke Python 3.11+ sehingga dapat:
   - [x] Update socket timeout handling
   - [x] Update `read()` dan `readline()` untuk bytes handling
 
-- [ ] **6.2** Update `imap_utils.py`:
-  - [ ] Update `GIMAPFetcher` class
-  - [ ] Update `retry` decorator untuk Python 3
-  - [ ] Update IMAP search/fetch methods
-  - [ ] Update label operations
-  - [ ] Update push/restore operations
+- [x] **6.2** Update `imap_utils.py`:
+  - [x] Update `GIMAPFetcher` class
+  - [x] Update `retry` decorator untuk Python 3
+  - [x] Update IMAP search/fetch methods
+  - [x] Update label operations
+  - [x] Update push/restore operations
 
 - [ ] **6.3** Implementasi rate limiting & exponential backoff:
   - [ ] Tambah delay antar request batch
