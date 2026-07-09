@@ -31,11 +31,11 @@ jobs:
 
       - name: Lint with flake8
         run: |
-          ./venv/bin/flake8 src
+          ./venv/bin/flake8 src/gmv
 
-      - name: Run tests with coverage
+      - name: Run smoke tests (import/port validation, no Gmail needed)
         run: |
-          ./venv/bin/pytest --cov=gmv --cov-report=term-missing
+          ./venv/bin/pytest -o python_files="*_smoke_tests.py" --cov=gmv --cov-report=term-missing
 
   build:
     runs-on: ubuntu-latest

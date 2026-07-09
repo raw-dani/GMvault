@@ -29,6 +29,7 @@ import os
 
 import imaplib  #for the exception
 import imapclient
+from imapclient import tls, imap4
 
 #enable imap debugging if GMV_IMAP_DEBUG is set 
 if os.getenv("GMV_IMAP_DEBUG"):
@@ -51,7 +52,14 @@ MON2NUM = {'Jan': 1, 'Feb': 2, 'Mar': 3, 'Apr': 4, 'May': 5, 'Jun': 6,
 def mod_convert_INTERNALDATE(date_string, normalise_times=True):#pylint: disable=C0103
     """
        monkey patched convert_INTERNALDATE
+
+       In IMAPClient 3.x the response parser passes ``date_string`` as
+       ``bytes`` (e.g. b"09-Jul-2026 12:00:00 +0000"). Decode it to a
+       ``str`` before matching the INTERNALDATE regex.
     """
+    if isinstance(date_string, bytes):
+        date_string = date_string.decode('ascii')
+
     mon = INTERNALDATE_RE.match('INTERNALDATE "%s"' % date_string)
     if not mon:
         raise ValueError("couldn't parse date %r" % date_string)
@@ -102,21 +110,35 @@ def to_bytes(s):
         return s.encode('ascii')
     return s
 
-class IMAP4COMPSSL(imaplib.IMAP4_SSL): #pylint:disable=R0904
+class IMAP4COMPSSL(tls.IMAP4_TLS): #pylint:disable=R0904
     """
        Add support for compression inspired by http://www.janeelix.com/piers/python/py2html.cgi/piers/python/imaplib2
-    """
-    SOCK_TIMEOUT = 70 # set a socket timeout of 70 sec to avoid for ever blockage in ssl.read
 
-    def __init__(self, host = '', port = imaplib.IMAP4_SSL_PORT, keyfile = None, certfile = None):
+       Based on imapclient's tls.IMAP4_TLS (Python 3 imaplib.IMAP4 + SSL
+       context) so it relies on the modern ssl module instead of the
+       deprecated ssl.wrap_socket / keyfile / certfile parameters.
+    """
+    SOCK_TIMEOUT = 70 # set a socket timeout of 70 sec to avoid for ever blockage
+
+    def __init__(self, host = '', port = 993, ssl_context = None, timeout = None):
         """
            constructor
         """
         self.compressor = None
         self.decompressor = None
-        
-        imaplib.IMAP4_SSL.__init__(self, host, port, keyfile, certfile)
-        
+
+        # tls.IMAP4_TLS.__init__ wraps the socket using the ssl context
+        tls.IMAP4_TLS.__init__(self, host, port, ssl_context, timeout)
+
+    def _create_socket(self, timeout = None):
+        """Create a SSL/TLS socket using the modern ssl context API.
+
+           A connect timeout of SOCK_TIMEOUT is applied so the connection
+           attempt cannot block forever.
+        """
+        sock = socket.create_connection((self.host, self.port), self.SOCK_TIMEOUT)
+        return tls.wrap_socket(sock, self.ssl_context, self.host)
+
     def activate_compression(self):
         """
            activate_compressing()
@@ -125,105 +147,61 @@ class IMAP4COMPSSL(imaplib.IMAP4_SSL): #pylint:disable=R0904
         # rfc 1951 - pure DEFLATE, so use -15 for both windows
         self.decompressor = zlib.decompressobj(-15)
         self.compressor   = zlib.compressobj(zlib.Z_DEFAULT_COMPRESSION, zlib.DEFLATED, -15)
-        
-    def open(self, host = '', port = imaplib.IMAP4_SSL_PORT): 
-        """Setup connection to remote server on "host:port".
-           (default: localhost:standard IMAP4 SSL port).
-           This connection will be used by the routines:
-           read, readline, send, shutdown.
-        """
-        self.host   = host
-        self.port   = port
 
-        self.sock   = socket.create_connection((host, port), self.SOCK_TIMEOUT) #add so_timeout  
-
-        #self.sock.setsockopt(socket.SOL_TCP, socket.TCP_NODELAY, 1) #try to set TCP NO DELAY to increase performances
-
-        self.sslobj = ssl.wrap_socket(self.sock, self.keyfile, self.certfile)
-        #self.sslobj = ssl.wrap_socket(self.sock, self.keyfile, self.certfile, suppress_ragged_eofs = False)
-        
-        # This is the last correction added to avoid memory fragmentation in imaplib
-        # makefile creates a file object that makes use of cStringIO to avoid mem fragmentation
-        # it could be used without the compression 
-        # (maybe make 2 set of methods without compression and with compression)
-        #self.file   = self.sslobj.makefile('rb')
-
-    def new_read(self, size):
+    def read(self, size):
         """
             Read 'size' bytes from remote.
-            Call _intern_read that takes care of the compression
+            Takes care of the compression.
         """
-        
-        chunks = io.BytesIO() #use BytesIO to hold socket bytes (avoid too much fragmentation)
+        chunks = io.BytesIO() #use BytesIO to hold socket bytes (avoid memory fragmentation)
         read = 0
         while read < size:
             try:
                 data = self._intern_read(min(size-read, 16384)) #never ask more than 16384 because imaplib can do it
             except ssl.SSLError as err:
-                print(("************* SSLError received %s" % (err))) 
+                print(("************* SSLError received %s" % (err)))
+                raise self.abort('Gmvault ssl socket error: EOF. Connection lost, reconnect.')
+            if not data:
+                #to avoid infinite looping due to empty bytes returned
                 raise self.abort('Gmvault ssl socket error: EOF. Connection lost, reconnect.')
             read += len(data)
             chunks.write(data)
-        
+
         return chunks.getvalue() #return the BytesIO content
-    
-    def read(self, size):
-        """
-            Read 'size' bytes from remote.
-            Call _intern_read that takes care of the compression
-        """
-        
-        chunks = io.BytesIO() #use BytesIO to hold socket bytes (avoid too much fragmentation)
-        read = 0
-        while read < size:
-            data = self._intern_read(min(size-read, 16384)) #never ask more than 16384 because imaplib can do it
-            if not data: 
-                #to avoid infinite looping due to empty string returned
-                raise self.abort('Gmvault ssl socket error: EOF. Connection lost, reconnect.') 
-            read += len(data)
-            chunks.write(data)
-        
-        return chunks.getvalue() #return the BytesIO content
-  
+
     def _intern_read(self, size):
         """
             Read at most 'size' bytes from remote.
-            Takes care of the compression
+            Takes care of the compression.
         """
         if self.decompressor is None:
-            return self.sslobj.read(size)
+            return self.sock.recv(size)
 
         if self.decompressor.unconsumed_tail:
             data = self.decompressor.unconsumed_tail
         else:
-            data = self.sslobj.read(8192) #Fixed buffer size. maybe change to 16384
+            data = self.sock.recv(8192) #Fixed buffer size. maybe change to 16384
 
         return self.decompressor.decompress(data, size)
-        
+
     def readline(self):
-        """Read line from remote."""
+        """Read line from remote (bytes)."""
         line = io.BytesIO() #use BytesIO to hold socket bytes (avoid memory fragmentation)
-        while 1:
+        while True:
             #make use of read that takes care of the compression
             #it could be simplified without compression
-            char = self.read(1) 
+            char = self.read(1)
             line.write(char)
-            if char in (b"\n", b""): 
+            if char in (b"\n", b""):
                 return line.getvalue()
-    
-    def shutdown(self):
-        """Close I/O established in "open"."""
-        #self.file.close() #if file created
-        self.sock.close()
-        
-      
+
     def send(self, data):
         """send(data)
         Send 'data' to remote."""
         if self.compressor is not None:
             data = self.compressor.compress(data)
             data += self.compressor.flush(zlib.Z_SYNC_FLUSH)
-        self.sslobj.sendall(data)
+        self.sock.sendall(data)
        
 def seq_to_parenlist(flags):
     """Convert a sequence of strings into parenthised list string for
@@ -241,11 +219,29 @@ class MonkeyIMAPClient(imapclient.IMAPClient): #pylint:disable=R0903,R0904
        Compression inspired by http://www.janeelix.com/piers/python/py2html.cgi/piers/python/imaplib2
     """
     
-    def __init__(self, host, port=None, use_uid=True, ssl=False):
+    def __init__(self, host, port=None, use_uid=True, ssl=False, timeout=IMAP4COMPSSL.SOCK_TIMEOUT):
         """
            constructor
         """
-        super(MonkeyIMAPClient, self).__init__(host, port, use_uid, ssl)
+        super(MonkeyIMAPClient, self).__init__(host, port, use_uid, ssl, timeout=timeout)
+
+    def _create_IMAP4(self):
+        """
+           Build the underlying imaplib connection.
+
+           Reuse IMAPClient's logic but plug `IMAP4COMPSSL` (which adds
+           DEFLATE compression support) for SSL connections so that
+           enable_compression() can call self._imap.activate_compression().
+        """
+        if self.stream:
+            return imaplib.IMAP4_stream(self.host)
+
+        connect_timeout = getattr(self._timeout, "connect", None)
+
+        if self.ssl:
+            return IMAP4COMPSSL(self.host, self.port, self.ssl_context, connect_timeout)
+
+        return imap4.IMAP4WithTimeout(self.host, self.port, connect_timeout)
 
     def oauth2_login(self, oauth2_cred):
         """

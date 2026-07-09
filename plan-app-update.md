@@ -177,13 +177,13 @@ Memporting Gmvault dari Python 2.7 ke Python 3.11+ sehingga dapat:
 
 ### Fase 6: Perbaikan IMAP & Jaringan (3-5 hari)
 
-- [ ] **6.1** Update `mod_imap.py`:
-  - [ ] Update `MonkeyIMAPClient` untuk IMAPClient 3.x
-  - [ ] Update `IMAP4COMPSSL` untuk Python 3 `ssl` module
-  - [ ] Perbaiki monkey-patching `_convert_INTERNALDATE`
-  - [ ] Update compression (DEFLATE) implementasi
-  - [ ] Update socket timeout handling
-  - [ ] Update `read()` dan `readline()` untuk bytes handling
+- [x] **6.1** Update `mod_imap.py`:
+  - [x] Update `MonkeyIMAPClient` untuk IMAPClient 3.x
+  - [x] Update `IMAP4COMPSSL` untuk Python 3 `ssl` module
+  - [x] Perbaiki monkey-patching `_convert_INTERNALDATE`
+  - [x] Update compression (DEFLATE) implementasi
+  - [x] Update socket timeout handling
+  - [x] Update `read()` dan `readline()` untuk bytes handling
 
 - [ ] **6.2** Update `imap_utils.py`:
   - [ ] Update `GIMAPFetcher` class
