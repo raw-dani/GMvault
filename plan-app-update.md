@@ -192,10 +192,10 @@ Memporting Gmvault dari Python 2.7 ke Python 3.11+ sehingga dapat:
   - [x] Update label operations
   - [x] Update push/restore operations
 
-- [ ] **6.3** Implementasi rate limiting & exponential backoff:
-  - [ ] Tambah delay antar request batch
-  - [ ] Handle Gmail rate limiting response
-  - [ ] Implementasi smart reconnect strategy
+- [x] **6.3** Implementasi rate limiting & exponential backoff:
+  - [x] Tambah delay antar request batch
+  - [x] Handle Gmail rate limiting response
+  - [x] Implementasi smart reconnect strategy
 
 ### Fase 7: Update Gmvault Core (3-4 hari)
 

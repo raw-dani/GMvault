@@ -23,6 +23,8 @@ import math
 import time
 import socket
 import re
+import random
+import threading
 import codecs
 
 import functools
@@ -69,7 +71,109 @@ class LabelError(Exception):
         """ ignore """
         return self._ignore
 
-#retry decorator with nb of tries and sleep_time and backoff
+# ---------------------------------------------------------------------------
+# Rate limiting & exponential backoff (phase 6.3)
+# ---------------------------------------------------------------------------
+
+# Substrings that Gmail uses to signal throttling / rate limiting.
+# When one of these is found in a server response we back off longer than for
+# a plain transient error.
+GMAIL_RATE_LIMIT_MARKERS = (
+    'too many requests',
+    'rate limit',
+    'rate-limit',
+    '[limit]',
+    'daily limit',
+    'temporary server error',
+    'temporarily unavailable',
+    'temporarily',
+    'try again later',
+    'overquota',
+    'backend error',
+)
+
+def is_rate_limited(message):
+    """
+       Return True if *message* looks like a Gmail rate-limit / throttle
+       response. Accepts str or bytes.
+    """
+    if not message:
+        return False
+
+    if isinstance(message, bytes):
+        try:
+            message = message.decode('utf-8', 'replace')
+        except Exception: #pylint: disable=W0703
+            message = str(message)
+
+    low = str(message).lower()
+    return any(marker in low for marker in GMAIL_RATE_LIMIT_MARKERS)
+
+class RateLimitError(imaplib.IMAP4.error):
+    """
+       Raised (or re-raised) when Gmail throttles the client so that the
+       retry decorator can apply a longer, exponential backoff.
+    """
+
+class RateLimiter(object): #pylint:disable=R0903
+    """
+       Track Gmail throttling and apply:
+
+       * a small, jittered delay before every request (rate limiting between
+         batches of requests),
+       * an exponential backoff (capped) each time the server signals rate
+         limiting, so connections are not hammered when throttled.
+
+       Delays are configurable through the [General] section of the gmvault
+       configuration file and fall back to sensible defaults when unset.
+    """
+    DEFAULT_REQUEST_DELAY = 0.5   # base delay between requests/batches (s)
+    DEFAULT_MAX_DELAY     = 300.0 # cap for the exponential backoff (s)
+    DEFAULT_JITTER        = 0.5   # extra random delay up to this (s)
+
+    def __init__(self):
+        cf = gmvault_utils.get_conf_defaults()
+        # tolerate both the project Conf API (get_float) and the fallback
+        # MockConf API (getfloat) when no configuration file is present.
+        float_getter = getattr(cf, 'get_float', None) or getattr(cf, 'getfloat', None)
+        self.request_delay = float_getter('General', 'request_delay', self.DEFAULT_REQUEST_DELAY)
+        self.max_delay     = float_getter('General', 'rate_limit_max_delay', self.DEFAULT_MAX_DELAY)
+        self.jitter        = float_getter('General', 'request_delay_jitter', self.DEFAULT_JITTER)
+        self._consecutive  = 0
+        self._lock         = threading.Lock()
+
+    def wait_before_request(self):
+        """
+           Sleep a small, jittered delay before issuing the next request.
+           Used to throttle the pace of requests between batches.
+        """
+        if self.request_delay <= 0:
+            return
+        time.sleep(self.request_delay + random.uniform(0, self.jitter))
+
+    def backoff(self, extra_factor = 1.0):
+        """
+           Exponential backoff for a rate-limit event. Each consecutive
+           rate-limit doubles the wait (capped by ``max_delay``) and a little
+           jitter is added. Returns the number of seconds waited.
+        """
+        with self._lock:
+            self._consecutive += 1
+            base = (2 ** self._consecutive) * max(self.request_delay, 1.0) * extra_factor
+            wait = min(self.max_delay, base)
+            waited = wait + random.uniform(0, self.jitter)
+            LOG.warning("Rate limited by Gmail. Backing off for %.1f seconds "
+                        "(consecutive throttle count = %d)." % (waited, self._consecutive))
+            time.sleep(waited)
+            return waited
+
+    def reset(self):
+        """Reset the consecutive rate-limit counter after a successful operation."""
+        with self._lock:
+            self._consecutive = 0
+
+
+
 def retry(a_nb_tries=3, a_sleep_time=1, a_backoff=1): #pylint:disable=R0912
     """
       Decorator for retrying command when it failed with a imap or socket error.
@@ -88,9 +192,13 @@ def retry(a_nb_tries=3, a_sleep_time=1, a_backoff=1): #pylint:disable=R0912
     if a_sleep_time <= 0:
         raise ValueError("a_sleep_time must be greater than 0")
     
-    def reconnect(the_self, rec_nb_tries, total_nb_tries, rec_error, rec_sleep_time = [1]): #pylint: disable=W0102
+    def reconnect(the_self, rec_nb_tries, total_nb_tries, rec_error, rec_sleep_time = [1], rate_limiter = None): #pylint: disable=W0102
         """
-           Reconnect procedure. Sleep and try to reconnect
+           Reconnect procedure. Sleep and try to reconnect.
+
+           When *rate_limiter* is available and the error is a Gmail
+           rate-limit response, an exponential backoff is applied (smart
+           reconnect) instead of the normal, short sleep.
         """
         # go in retry mode if less than a_nb_tries
         while rec_nb_tries[0] < total_nb_tries:
@@ -98,15 +206,19 @@ def retry(a_nb_tries=3, a_sleep_time=1, a_backoff=1): #pylint:disable=R0912
             LOG.critical("Disconnecting from Gmail Server and sleeping ...")
             the_self.disconnect()            
             
-            # add X sec of wait
-            time.sleep(rec_sleep_time[0])
-            rec_sleep_time[0] *= a_backoff #increase sleep time for next time
+            if rate_limiter is not None and is_rate_limited(str(rec_error)):
+                # smart reconnect: back off exponentially when throttled
+                rate_limiter.backoff()
+            else:
+                # add X sec of wait
+                time.sleep(rec_sleep_time[0])
+                rec_sleep_time[0] *= a_backoff #increase sleep time for next time
             
             rec_nb_tries[0] += 1
             
             #increase total nb of reconns
             the_self.total_nb_reconns += 1
-           
+            
             # go in retry mode: reconnect.
             # retry reconnect as long as we have tries left
             try:
@@ -114,6 +226,9 @@ def retry(a_nb_tries=3, a_sleep_time=1, a_backoff=1): #pylint:disable=R0912
                 
                 #reconnect to the current folder
                 the_self.connect(go_to_current_folder = True )
+                
+                if rate_limiter is not None:
+                    rate_limiter.reset()
                 
                 return 
             
@@ -128,6 +243,8 @@ def retry(a_nb_tries=3, a_sleep_time=1, a_backoff=1): #pylint:disable=R0912
         def wrapper(*args, **kwargs): #pylint:disable=C0111,R0912
             nb_tries = [0] # make it mutable in reconnect
             m_sleep_time = [a_sleep_time]  #make it mutable in reconnect
+            # rate limiter is carried by the decorated object (GIMAPFetcher)
+            rate_limiter = getattr(args[0], 'rate_limiter', None) if args else None
             while True:
                 try:
                     return the_func(*args, **kwargs)
@@ -140,7 +257,7 @@ def retry(a_nb_tries=3, a_sleep_time=1, a_backoff=1): #pylint:disable=R0912
                     else:
                         LOG.critical("Stop retrying, tried too many times ...")
                     
-                    reconnect(args[0], nb_tries, a_nb_tries, p_err, m_sleep_time)
+                    reconnect(args[0], nb_tries, a_nb_tries, p_err, m_sleep_time, rate_limiter)
                 
                 except imaplib.IMAP4.abort as err: #abort is recoverable and error is not
                     
@@ -152,7 +269,7 @@ def retry(a_nb_tries=3, a_sleep_time=1, a_backoff=1): #pylint:disable=R0912
                         LOG.critical("Stop retrying, tried too many times ...")
                         
                     # problem with this email, put it in quarantine
-                    reconnect(args[0], nb_tries, a_nb_tries, err, m_sleep_time)    
+                    reconnect(args[0], nb_tries, a_nb_tries, err, m_sleep_time, rate_limiter)    
                     
                 except ssl.SSLError as ssl_err:
                     LOG.debug("error message = %s. traceback:%s" % (ssl_err, gmvault_utils.get_exception_traceback()))
@@ -162,7 +279,7 @@ def retry(a_nb_tries=3, a_sleep_time=1, a_backoff=1): #pylint:disable=R0912
                     else:
                         LOG.critical("Stop retrying, tried too many times ...")
                         
-                    reconnect(args[0], nb_tries, a_nb_tries, ssl_err, m_sleep_time)
+                    reconnect(args[0], nb_tries, a_nb_tries, ssl_err, m_sleep_time, rate_limiter)
                 
                 except socket.error as sock_err:
                     LOG.debug("error message = %s. traceback:%s" % (sock_err, gmvault_utils.get_exception_traceback()))
@@ -172,7 +289,7 @@ def retry(a_nb_tries=3, a_sleep_time=1, a_backoff=1): #pylint:disable=R0912
                     else:
                         LOG.critical("Stop retrying, tried too many times ...")
                         
-                    reconnect(args[0], nb_tries, a_nb_tries, sock_err, m_sleep_time)
+                    reconnect(args[0], nb_tries, a_nb_tries, sock_err, m_sleep_time, rate_limiter)
                 
                 except imaplib.IMAP4.error as err:
                     
@@ -187,7 +304,7 @@ def retry(a_nb_tries=3, a_sleep_time=1, a_backoff=1): #pylint:disable=R0912
                     
                     #raise err
                     # retry 2 times before to quit
-                    reconnect(args[0], nb_tries, 2, err, m_sleep_time)
+                    reconnect(args[0], nb_tries, 2, err, m_sleep_time, rate_limiter)
 
         return functools.wraps(the_func)(wrapper)
         #return wrapper
@@ -269,6 +386,8 @@ class GIMAPFetcher(object): #pylint:disable=R0902,R0904
         self.server                 = None
         self.go_to_all_folder       = True
         self.total_nb_reconns       = 0
+        # rate limiter used to throttle requests and back off on Gmail throttling
+        self.rate_limiter           = RateLimiter()
         # True when CHATS or other folder error msg has been already printed
         self.printed_folder_error_msg = { 'ALLMAIL' : False, 'CHATS': False , 'DRAFTS':False }
         
@@ -511,17 +630,11 @@ class GIMAPFetcher(object): #pylint:disable=R0902,R0904
         return True
     
     @retry(3,1,2) # try 3 times to reconnect with a sleep time of 1 sec and a backoff of 2. The fourth time will wait 4 sec
-    def search(self, a_criteria):
-        """
-           Return all found ids corresponding to the search
-        """
-        return self.server.search(a_criteria)
-    
-    @retry(3,1,2) # try 4 times to reconnect with a sleep time of 1 sec and a backoff of 2. The fourth time will wait 8 sec
     def fetch(self, a_ids, a_attributes):
         """
            Return all attributes associated to each message
         """
+        self.rate_limiter.wait_before_request() # throttle the pace between batches
         return self.server.fetch(a_ids, a_attributes)
 
     @classmethod
@@ -640,6 +753,8 @@ class GIMAPFetcher(object): #pylint:disable=R0902,R0904
         # go to All Mail folder
         LOG.debug("Applying labels %s" % (labels))
         
+        self.rate_limiter.wait_before_request() # throttle the pace of label requests
+
         the_timer = gmvault_utils.Timer()
         the_timer.start()
 
@@ -790,6 +905,8 @@ class GIMAPFetcher(object): #pylint:disable=R0902,R0904
         if self.login == 'guillaume.aubert@gmail.com':
             raise Exception("Cannot push to this account")
         
+        self.rate_limiter.wait_before_request() # throttle the pace of restore requests
+
         the_timer = gmvault_utils.Timer()
         the_timer.start()
         LOG.debug("Before to Append email contents")
