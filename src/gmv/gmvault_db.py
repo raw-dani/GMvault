@@ -24,10 +24,8 @@ import os
 import itertools
 import fnmatch
 import shutil
-import codecs
 import io
 
-import gmv.blowfish as blowfish
 import gmv.log_utils as log_utils
 
 import gmv.collections_utils as collections_utils
@@ -35,7 +33,45 @@ import gmv.gmvault_utils as gmvault_utils
 import gmv.imap_utils as imap_utils
 import gmv.credential_utils as credential_utils
 
+from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
+from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.backends import default_backend
+
 LOG = log_utils.LoggerFactory.get_logger('gmvault_db')
+
+
+class AESCipher(object):
+    """
+    AES-256 encryption cipher compatible with the old Blowfish interface.
+    Uses AES in CTR mode for stream-like encryption.
+    """
+    def __init__(self, key):
+        if isinstance(key, str):
+            key = key.encode('utf-8')
+        digest = hashes.Hash(hashes.SHA256(), backend=default_backend())
+        digest.update(key)
+        self._key = digest.finalize()
+        self._nonce = None
+        self._encryptor = None
+
+    def initCTR(self, nonce=None):
+        if nonce is None:
+            nonce = os.urandom(16)
+        self._nonce = nonce
+        cipher = Cipher(algorithms.AES(self._key), modes.CTR(nonce), backend=default_backend())
+        self._encryptor = cipher.encryptor()
+
+    def encryptCTR(self, data):
+        if isinstance(data, str):
+            data = data.encode('utf-8')
+        return self._nonce + self._encryptor.update(data) + self._encryptor.finalize()
+
+    def decryptCTR(self, data):
+        nonce = data[:16]
+        ciphertext = data[16:]
+        cipher = Cipher(algorithms.AES(self._key), modes.CTR(nonce), backend=default_backend())
+        decryptor = cipher.decryptor()
+        return decryptor.update(ciphertext) + decryptor.finalize()
 
 
 class GmailStorer(object): #pylint:disable=R0902,R0904,R0914
@@ -148,7 +184,7 @@ class GmailStorer(object): #pylint:disable=R0902,R0904,R0914
             else:
                 the_max = max(nb_to_dir)
                 files = os.listdir("%s/%s" % (self._chats_dir, nb_to_dir[the_max]))
-                self._sub_chats_nb  = len(files)/2
+                self._sub_chats_nb  = len(files) // 2
                 self._sub_chats_inc = the_max
                 self._sub_chats_dir = self.SUB_CHAT_AREA % nb_to_dir[the_max] 
 
@@ -178,7 +214,7 @@ class GmailStorer(object): #pylint:disable=R0902,R0904,R0914
         """
         version_file = '%s/%s' % (self._info_dir, self.GMVAULTDB_VERSION)
         if not os.path.exists(version_file):
-            with open(version_file, "w+") as f:
+            with open(version_file, "w+", encoding='utf-8') as f:
                 f.write(gmvault_utils.GMVAULT_VERSION)
 
     def store_db_owner(self, email_owner):
@@ -191,7 +227,7 @@ class GmailStorer(object): #pylint:disable=R0902,R0904,R0914
 
         if email_owner not in owners:
             owners.append(email_owner)
-            with open('%s/%s' % (self._info_dir, self.EMAIL_OWNER), "w+") as f:
+            with open('%s/%s' % (self._info_dir, self.EMAIL_OWNER), "w+", encoding='utf-8') as f:
                 json.dump(owners, f, ensure_ascii=False)
                 f.flush()
 
@@ -202,7 +238,7 @@ class GmailStorer(object): #pylint:disable=R0902,R0904,R0914
         """
         fname = '%s/%s' % (self._info_dir, self.EMAIL_OWNER)
         if os.path.exists(fname):    
-            with open(fname, 'r') as f:
+            with open(fname, 'r', encoding='utf-8') as f:
                 list_of_owners = json.load(f)
             return list_of_owners
 
@@ -224,8 +260,8 @@ class GmailStorer(object): #pylint:disable=R0902,R0904,R0914
                 self._encryption_key = credential_utils.CredentialHelper.get_secret_key('%s/%s'
                 % (self._info_dir, self.ENCRYPTION_KEY_FILENAME))
 
-            #create blowfish cipher if data needs to be encrypted
-            self._cipher = blowfish.Blowfish(self._encryption_key)
+            #create AES cipher if data needs to be encrypted
+            self._cipher = AESCipher(self._encryption_key)
 
         return self._cipher
 
@@ -258,23 +294,16 @@ class GmailStorer(object): #pylint:disable=R0902,R0904,R0914
         matched = GmailStorer.HF_SUB_RE.search(header_fields)
         if matched:
             tempo = matched.group('subject').strip()
-            #guess encoding and convert to utf-8
-            u_tempo  = None
-            encod    = "not found"
-            try:
-                encod  = gmvault_utils.guess_encoding(tempo, use_encoding_list = False)
-                u_tempo = str(tempo, encoding = encod)
-            except gmvault_utils.GuessEncoding as enc_err:
-                  #it is already in unicode so ignore encoding
-                  u_tempo = tempo
-            except Exception as e:
-                  LOG.critical(e)
-                  LOG.critical("Warning: Guessed encoding = (%s). Ignore those characters" % (encod))
-                  #try utf-8
-                  u_tempo = str(tempo, encoding="utf-8", errors='replace')
-
-            if u_tempo:
-                subject = u_tempo.encode('utf-8')
+            if isinstance(tempo, bytes):
+                try:
+                    encod = gmvault_utils.guess_encoding(tempo, use_encoding_list=False)
+                    subject = tempo.decode(encod)
+                except gmvault_utils.GuessEncoding:
+                    subject = tempo.decode('utf-8', errors='replace')
+                except Exception:
+                    subject = tempo.decode('utf-8', errors='replace')
+            else:
+                subject = tempo
 
         # look for a msg id
         matched = GmailStorer.HF_MSGID_RE.search(header_fields)
@@ -375,7 +404,7 @@ class GmailStorer(object): #pylint:disable=R0902,R0904,R0914
         meta_path = self.METADATA_FNAME % (
             the_dir, email_info[imap_utils.GIMAPFetcher.GMAIL_ID])
 
-        with open(meta_path, 'w') as meta_desc:
+        with open(meta_path, 'w', encoding='utf-8') as meta_desc:
             # parse header fields to extract subject and msgid
             subject, msgid, received = self.parse_header_fields(
                 email_info[imap_utils.GIMAPFetcher.IMAP_HEADER_FIELDS_KEY])
@@ -403,7 +432,7 @@ class GmailStorer(object): #pylint:disable=R0902,R0904,R0914
                          self.XGM_RECV_K   : received
                        }
 
-            json.dump(meta_obj, meta_desc)
+            json.dump(meta_obj, meta_desc, ensure_ascii=False)
 
             meta_desc.flush()
 
@@ -440,7 +469,7 @@ class GmailStorer(object): #pylint:disable=R0902,R0904,R0914
             the_dir, email_info[imap_utils.GIMAPFetcher.GMAIL_ID])
 
         # TODO: First compress then encrypt
-        # create a compressed CIOString  and encrypt it
+        # create a compressed BytesIO and encrypt it
 
         #if compress:
         #   data_path = '%s.gz' % data_path
@@ -451,7 +480,7 @@ class GmailStorer(object): #pylint:disable=R0902,R0904,R0914
         #if self._encrypt_data:
         #    data_path = '%s.crypt2' % data_path
 
-        #TODO create a wrapper fileobj that compress in io string
+        #TODO create a wrapper fileobj that compress in io BytesIO
         #then chunk write
         #then compress
         #then encrypt if it is required
@@ -546,7 +575,7 @@ class GmailStorer(object): #pylint:disable=R0902,R0904,R0914
         """
            metadata file
         """
-        f = open(self.METADATA_FNAME % (a_dir, a_id))
+        f = open(self.METADATA_FNAME % (a_dir, a_id), encoding='utf-8')
         try:
             yield f
         finally:

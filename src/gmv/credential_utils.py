@@ -31,10 +31,46 @@ import os
 import getpass
 
 import gmv.log_utils as log_utils
-import gmv.blowfish as blowfish
 import gmv.gmvault_utils as gmvault_utils
 
+from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
+from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.backends import default_backend
+
 LOG = log_utils.LoggerFactory.get_logger('credential_utils')
+
+class AESCipher(object):
+    """
+    AES-256 encryption cipher compatible with the old Blowfish interface.
+    Uses AES in CTR mode for stream-like encryption.
+    """
+    def __init__(self, key):
+        if isinstance(key, str):
+            key = key.encode('utf-8')
+        digest = hashes.Hash(hashes.SHA256(), backend=default_backend())
+        digest.update(key)
+        self._key = digest.finalize()
+        self._nonce = None
+        self._encryptor = None
+
+    def initCTR(self, nonce=None):
+        if nonce is None:
+            nonce = os.urandom(16)
+        self._nonce = nonce
+        cipher = Cipher(algorithms.AES(self._key), modes.CTR(nonce), backend=default_backend())
+        self._encryptor = cipher.encryptor()
+
+    def encryptCTR(self, data):
+        if isinstance(data, str):
+            data = data.encode('utf-8')
+        return self._nonce + self._encryptor.update(data) + self._encryptor.finalize()
+
+    def decryptCTR(self, data):
+        nonce = data[:16]
+        ciphertext = data[16:]
+        cipher = Cipher(algorithms.AES(self._key), modes.CTR(nonce), backend=default_backend())
+        decryptor = cipher.decryptor()
+        return decryptor.update(ciphertext) + decryptor.finalize()
 
 def get_oauth2_client_id():
     """Return the OAuth2 client id from GMVAULT_CLIENT_ID env var or conf defaults."""
@@ -168,13 +204,14 @@ class CredentialHelper(object):
         else:
             secret = gmvault_utils.make_password()
 
+            secret_bytes = secret.encode('utf-8')
             fdesc = os.open(a_filepath, os.O_CREAT|os.O_WRONLY, 0o600)
             try:
-                the_bytes = os.write(fdesc, secret)
+                the_bytes = os.write(fdesc, secret_bytes)
             finally:
                 os.close(fdesc) #close anyway
 
-            if the_bytes < len(secret):
+            if the_bytes < len(secret_bytes):
                 raise Exception("Error: Cannot write secret in %s" % a_filepath)
 
         return secret
@@ -188,7 +225,7 @@ class CredentialHelper(object):
     
         fdesc = os.open(passwd_file, os.O_CREAT|os.O_WRONLY, 0o600)
         
-        cipher       = blowfish.Blowfish(cls.get_secret_key(cls.SECRET_FILEPATH % (gmvault_utils.get_home_dir_path())))
+        cipher       = AESCipher(cls.get_secret_key(cls.SECRET_FILEPATH % (gmvault_utils.get_home_dir_path())))
         cipher.initCTR()
     
         encrypted = cipher.encryptCTR(passwd)
@@ -210,7 +247,7 @@ class CredentialHelper(object):
         fdesc = os.open(oauth_file, os.O_RDWR|os.O_CREAT )
 
         #write new content
-        fobj = os.fdopen(fdesc, "w")
+        fobj = os.fdopen(fdesc, "w", encoding='utf-8')
 
         #empty file
         fobj.truncate()
@@ -245,7 +282,7 @@ class CredentialHelper(object):
             LOG.critical("Get OAuth2 credential from %s.\n" % user_oauth_file_path)
 
             try:
-                with open(user_oauth_file_path) as oauth_file:
+                with open(user_oauth_file_path, encoding='utf-8') as oauth_file:
                     oauth_result = json.load(oauth_file)
             except Exception as _: #pylint: disable-msg=W0703
                 LOG.critical("Cannot read oauth credentials from %s. Force oauth credentials renewal." % user_oauth_file_path)
@@ -270,9 +307,9 @@ class CredentialHelper(object):
 
         password = None
         if os.path.exists(user_passwd_file_path):
-            with open(user_passwd_file_path) as f:
+            with open(user_passwd_file_path, 'rb') as f:
                 password = f.read()
-            cipher       = blowfish.Blowfish(cls.get_secret_key(cls.SECRET_FILEPATH % (gmvault_utils.get_home_dir_path())))
+            cipher       = AESCipher(cls.get_secret_key(cls.SECRET_FILEPATH % (gmvault_utils.get_home_dir_path())))
             cipher.initCTR()
             password     = cipher.decryptCTR(password)
 

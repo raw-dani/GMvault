@@ -206,12 +206,12 @@ Memporting Gmvault dari Python 2.7 ke Python 3.11+ sehingga dapat:
   - [x] Update restore operations (`restore_emails`, `restore_chats`)
   - [x] Update `check_clean_db` dan `_delete_sync`
   
-- [ ] **7.2** Update `gmvault_db.py`:
-  - [ ] Fix `GmailStorer` untuk Python 3
-  - [ ] Update file I/O (bytes vs string)
-  - [ ] Update JSON serialization
-  - [ ] Update gzip compression
-  - [ ] Update enkripsi Blowfish → AES (atau ganti dengan `cryptography` library)
+- [x] **7.2** Update `gmvault_db.py`:
+  - [x] Fix `GmailStorer` untuk Python 3
+  - [x] Update file I/O (bytes vs string)
+  - [x] Update JSON serialization
+  - [x] Update gzip compression
+  - [x] Update enkripsi Blowfish → AES (atau ganti dengan `cryptography` library)
 
 - [ ] **7.3** Update `gmvault_export.py`:
   - [ ] Fix export functionality untuk Python 3

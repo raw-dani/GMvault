@@ -630,7 +630,7 @@ class TestGMVault(unittest.TestCase): #pylint:disable-msg=R0904
         
         email_meta, email_data = gstorer.unbury_email(1384313269332005293)
         
-        self.assertTrue(email_data.startswith("Delivered-To: guillaume.aubert@gmail.com"))
+        self.assertTrue(email_data.startswith(b"Delivered-To: guillaume.aubert@gmail.com"))
         
         #print("Email Data = \n%s\n" % (email_data))
             
