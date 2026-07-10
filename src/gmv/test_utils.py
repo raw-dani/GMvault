@@ -78,7 +78,7 @@ def check_remote_mailbox_identical_to_local(the_self, gmvaulter, extra_labels = 
             subject = subject.split('"')[0]
             if has_something: #add extra space if it has a date
                 req += ' ' 
-            req += 'SUBJECT "{subject}"'.format(subject=subject.strip().encode('utf-8'))
+            req += 'SUBJECT "{subject}"'.format(subject=subject.strip())
             has_something = True
 
         if msgid:
@@ -310,15 +310,15 @@ def diff_online_mailboxes(gmvaulter_a, gmvaulter_b): #pylint: disable=R0912, R09
             
             the_hash = hashlib.md5()
             if received:
-                the_hash.update(received)
+                the_hash.update(received.encode('utf-8'))
             
             if subject:
-                the_hash.update(subject)
+                the_hash.update(subject.encode('utf-8'))
                 
             if msgid:
-                the_hash.update(msgid)
+                the_hash.update(msgid.encode('utf-8'))
 
-            id =  base64.encodestring(the_hash.digest())
+            id =  base64.encodebytes(the_hash.digest()).decode('ascii')
     
             gm_ids_b[id] = [gm_id, subject, msgid]
 
@@ -337,15 +337,15 @@ def diff_online_mailboxes(gmvaulter_a, gmvaulter_b): #pylint: disable=R0912, R09
             
             the_hash = hashlib.md5()
             if received:
-                the_hash.update(received)
+                the_hash.update(received.encode('utf-8'))
             
             if subject:
-                the_hash.update(subject)
+                the_hash.update(subject.encode('utf-8'))
                 
             if msgid:
-                the_hash.update(msgid)
+                the_hash.update(msgid.encode('utf-8'))
 
-            id =  base64.encodestring(the_hash.digest())
+            id =  base64.encodebytes(the_hash.digest()).decode('ascii')
     
             if id not in gm_ids_b:
                 diff_result["in_a"][received] = [gm_id, subject, msgid]
@@ -398,17 +398,17 @@ def clean_mailbox(login , credential):
 
 def obfuscate_string(a_str):
     """ use base64 to obfuscate a string """
-    return base64.b64encode(a_str)
+    return base64.b64encode(a_str).decode('ascii')
 
 def deobfuscate_string(a_str):
     """ deobfuscate a string """
-    return base64.b64decode(a_str)
+    return base64.b64decode(a_str.encode('ascii'))
 
 def read_password_file(a_path):
     """
        Read log:pass from a file in my home
     """
-    with open(a_path) as f:
+    with open(a_path, encoding='utf-8') as f:
         line = f.readline()
     login, passwd = line.split(":")
 
@@ -428,7 +428,7 @@ def get_oauth_cred(email, cred_path):
         print(("Get XOAuth credential from %s.\n" % user_oauth_file_path))
 
         try:
-            with open(user_oauth_file_path) as oauth_file:
+            with open(user_oauth_file_path, encoding='utf-8') as oauth_file:
                 oauth_result = oauth_file.read()
             if oauth_result:
                 oauth_result = oauth_result.split('::')

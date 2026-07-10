@@ -23,7 +23,6 @@ MODULES = [
     "gmv.conf.exceptions",
     "gmv.conf.conf_helper",
     "gmv.conf.utils.struct_parser",
-    "gmv.blowfish",
     "gmv.collections_utils",
     "gmv.gmvault_const",
     "gmv.gmvault_utils",

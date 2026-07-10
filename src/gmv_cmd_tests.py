@@ -33,17 +33,17 @@ import gmv.credential_utils as credential_utils
 
 def obfuscate_string(a_str):
     """ use base64 to obfuscate a string """
-    return base64.b64encode(a_str)
+    return base64.b64encode(a_str).decode('ascii')
 
 def deobfuscate_string(a_str):
     """ deobfuscate a string """
-    return base64.b64decode(a_str)
+    return base64.b64decode(a_str.encode('ascii'))
 
 def read_password_file(a_path):
     """
        Read log:pass from a file in my home
     """
-    with open(a_path) as f:
+    with open(a_path, encoding='utf-8') as f:
         line = f.readline()
         login, passwd = line.split(":")
 
@@ -98,7 +98,7 @@ class TestGMVCMD(unittest.TestCase): #pylint:disable-msg=R0904
         self.assertEqual(args['type'],     'full')
         self.assertEqual(args['email'],    self.login)
         self.assertEqual(args['passwd'],   'not_seen')
-        self.assertEqual(args['oauth'],    'empty')
+        self.assertEqual(args['oauth2'],   'empty')
         self.assertEqual(args['request'], {'req': 'ALL', 'type': 'imap'})
         self.assertEqual(args['host'],'imap.gmail.com')
         self.assertEqual(args['port'], 993)
@@ -120,7 +120,7 @@ class TestGMVCMD(unittest.TestCase): #pylint:disable-msg=R0904
         self.assertEqual(args['type'],     'custom')
         self.assertEqual(args['email'],    self.login)
         self.assertEqual(args['passwd'],   'not_seen')
-        self.assertEqual(args['oauth'],    'empty')
+        self.assertEqual(args['oauth2'],   'empty')
         self.assertEqual(args['request'], {'req': 'Since 1-Nov-2011 Before 4-Nov-2011', 'type': 'imap'})
         self.assertEqual(args['host'],'imap.gmail.com')
         self.assertEqual(args['port'], 993)
@@ -142,7 +142,7 @@ class TestGMVCMD(unittest.TestCase): #pylint:disable-msg=R0904
         self.assertEqual(args['type'],     'custom')
         self.assertEqual(args['email'],    self.login)
         self.assertEqual(args['passwd'],   'not_seen')
-        self.assertEqual(args['oauth'],    'empty')
+        self.assertEqual(args['oauth2'],   'empty')
         self.assertEqual(args['request'], {'req': 'subject:Chandeleur bis', 'type': 'gmail'})
         self.assertEqual(args['host'],'imap.gmail.com')
         self.assertEqual(args['port'], 993)
@@ -167,7 +167,7 @@ class TestGMVCMD(unittest.TestCase): #pylint:disable-msg=R0904
         self.assertEqual(args['type'],     'custom')
         self.assertEqual(args['email'],    self.login)
         self.assertEqual(args['passwd'],   'not_seen')
-        self.assertEqual(args['oauth'],    'empty')
+        self.assertEqual(args['oauth2'],   'empty')
         self.assertEqual(args['request'], {'req': 'subject:Chandeleur bis', 'type': 'gmail'})
         self.assertEqual(args['host'],'imap.gmail.com')
         self.assertEqual(args['port'], 993)
@@ -191,7 +191,7 @@ class TestGMVCMD(unittest.TestCase): #pylint:disable-msg=R0904
         self.assertEqual(args['type'],     'custom')
         self.assertEqual(args['email'],    self.login)
         self.assertEqual(args['passwd'],   'not_seen')
-        self.assertEqual(args['oauth'],    'empty')
+        self.assertEqual(args['oauth2'],   'empty')
         self.assertEqual(args['request'], {'req': 'subject:Chandeleur bis', 'type': 'gmail'})
         self.assertEqual(args['host'],'imap.gmail.com')
         self.assertEqual(args['port'], 993)
@@ -222,7 +222,7 @@ class TestGMVCMD(unittest.TestCase): #pylint:disable-msg=R0904
         self.assertEqual(args['type'],     'custom')
         self.assertEqual(args['email'],    self.login)
         self.assertEqual(args['passwd'],   'not_seen')
-        self.assertEqual(args['oauth'],    'empty')
+        self.assertEqual(args['oauth2'],   'empty')
         self.assertEqual(args['request'], {'req': 'subject:Chandeleur bis', 'type': 'gmail'})
         self.assertEqual(args['host'],'imap.gmail.com')
         self.assertEqual(args['port'], 993)
@@ -334,7 +334,7 @@ class TestGMVCMD(unittest.TestCase): #pylint:disable-msg=R0904
             self.assertEqual(args['email'], self.login)
             self.assertEqual(args['passwd'],'empty')
             self.assertEqual(args['request'], {'req': 'Since 1-Nov-2011 Before 10-Nov-2011', 'type': 'imap'})
-            self.assertEqual(args['oauth'], 'not_seen')
+            self.assertEqual(args['oauth2'], 'not_seen')
             self.assertEqual(args['host'],'imap.gmail.com')
             self.assertEqual(args['port'], 993)
             self.assertEqual(args['db-dir'],'./gmvault-db')

@@ -25,20 +25,20 @@ import gmv.imap_utils as imap_utils
 
 def obfuscate_string(a_str):
     """ use base64 to obfuscate a string """
-    return base64.b64encode(a_str)
+    return base64.b64encode(a_str).decode('ascii')
 
 def deobfuscate_string(a_str):
     """ deobfuscate a string """
-    return base64.b64decode(a_str)
+    return base64.b64decode(a_str.encode('ascii'))
 
 def read_password_file(a_path):
     """
        Read log:pass from a file in my home
     """
-    with open(a_path) as f:
+    with open(a_path, encoding='utf-8') as f:
         line = f.readline()
     login, passwd = line.split(":")
-
+    
     return deobfuscate_string(login.strip()), deobfuscate_string(passwd.strip())
 
 def delete_db_dir(a_db_dir):

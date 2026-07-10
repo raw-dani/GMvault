@@ -223,11 +223,11 @@ Memporting Gmvault dari Python 2.7 ke Python 3.11+ sehingga dapat:
 
 ### Fase 8: Testing (3-5 hari)
 
-- [ ] **8.1** Update test infrastructure:
-  - [ ] Update `gmvault_tests.py` untuk Python 3
-  - [ ] Update `gmv_cmd_tests.py` untuk Python 3
-  - [ ] Update `validation_tests.py` untuk Python 3
-  - [ ] Update `gmvault_essential_tests.py` untuk Python 3
+- [x] **8.1** Update test infrastructure:
+  - [x] Update `gmvault_tests.py` untuk Python 3
+  - [x] Update `gmv_cmd_tests.py` untuk Python 3
+  - [x] Update `validation_tests.py` untuk Python 3
+  - [x] Update `gmvault_essential_tests.py` untuk Python 3
   
 - [ ] **8.2** Mock Gmail IMAP server untuk unit test:
   - [ ] Buat mock IMAP server menggunakan `aiosmtpd` atau custom mock
