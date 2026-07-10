@@ -301,6 +301,11 @@ class MockConf(object):
     def getboolean(cls, section, option, default=False, fail_if_missing=False):#pylint: disable=W0613
         """get bool value """
         return default
+
+    @classmethod
+    def get_boolean(cls, section, option, default=False, fail_if_missing=False):#pylint: disable=W0613
+        """get bool value (snake_case alias)"""
+        return default
     
     @classmethod
     def get_list(cls, section, option, default=None, fail_if_missing=False):#pylint: disable=W0613

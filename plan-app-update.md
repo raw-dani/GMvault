@@ -229,9 +229,9 @@ Memporting Gmvault dari Python 2.7 ke Python 3.11+ sehingga dapat:
   - [x] Update `validation_tests.py` untuk Python 3
   - [x] Update `gmvault_essential_tests.py` untuk Python 3
   
-- [ ] **8.2** Mock Gmail IMAP server untuk unit test:
-  - [ ] Buat mock IMAP server menggunakan `aiosmtpd` atau custom mock
-  - [ ] Mock OAuth2 endpoints
+- [x] **8.2** Mock Gmail IMAP server untuk unit test:
+  - [x] Buat mock IMAP server menggunakan custom mock
+  - [x] Mock OAuth2 endpoints
   
 - [ ] **8.3** Integration test:
   - [ ] Buat test Gmail account untuk integration test
