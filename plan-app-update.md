@@ -213,8 +213,8 @@ Memporting Gmvault dari Python 2.7 ke Python 3.11+ sehingga dapat:
   - [x] Update gzip compression
   - [x] Update enkripsi Blowfish → AES (atau ganti dengan `cryptography` library)
 
-- [ ] **7.3** Update `gmvault_export.py`:
-  - [ ] Fix export functionality untuk Python 3
+- [x] **7.3** Update `gmvault_export.py`:
+  - [x] Fix export functionality untuk Python 3
 
 - [ ] **7.4** Update `gmv_cmd.py`:
   - [ ] Fix CLI parser (`argparse` → API yang baru)

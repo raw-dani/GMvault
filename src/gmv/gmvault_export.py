@@ -72,7 +72,7 @@ class GMVaultExporter(object):
 
     def printable_label_list(self, labels):
         """helper to print a list of labels"""
-        labels = [l.encode('ascii', 'backslashreplace') for l in labels]
+        labels = [l.encode('ascii', 'backslashreplace').decode('ascii') for l in labels]
         return '; '.join(labels)
 
     def export_ids(self, kind, ids, default_folder, use_labels):
@@ -153,7 +153,7 @@ class Maildir(Mailbox):
             parent = GMVaultExporter.GM_SEP.join(parts[:-1])
             self.subdir(parent)
             path = self.subdir_name(folder)
-            path = imap_utf7.encode(path)
+            path = imap_utf7.encode(path).decode('ascii')
         else:
             if not self.root_is_maildir():
                 return
