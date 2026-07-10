@@ -216,10 +216,10 @@ Memporting Gmvault dari Python 2.7 ke Python 3.11+ sehingga dapat:
 - [x] **7.3** Update `gmvault_export.py`:
   - [x] Fix export functionality untuk Python 3
 
-- [ ] **7.4** Update `gmv_cmd.py`:
-  - [ ] Fix CLI parser (`argparse` → API yang baru)
-  - [ ] Update command handlers
-  - [ ] Fix signal handling
+- [x] **7.4** Update `gmv_cmd.py`:
+  - [x] Fix CLI parser (`argparse` → API yang baru)
+  - [x] Update command handlers
+  - [x] Fix signal handling
 
 ### Fase 8: Testing (3-5 hari)
 

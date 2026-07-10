@@ -739,7 +739,7 @@ class GMVaultLauncher(object):
         die_with_usage = True
         
         try:
-            if args.get('command') not in ('export'):
+            if args.get('command') != 'export':
                 credential = CredentialHelper.get_credential(args)
             
             if args.get('command', '') == 'sync':
@@ -824,12 +824,15 @@ def sigusr1_handler(signum, frame): #pylint:disable=W0613
     print(("GMVAULT: Received SIGUSR1 -- Printing stack trace in %s..." %
           os.path.abspath(filename)))
 
-    with open(filename, 'a') as f:
+    with open(filename, 'a', encoding='utf-8') as f:
         traceback.print_stack(file=f)
 
 def register_traceback_signal():
     """ To register a USR1 signal allowing to get stack trace """
-    signal.signal(signal.SIGUSR1, sigusr1_handler)
+    try:
+        signal.signal(signal.SIGUSR1, sigusr1_handler)
+    except (AttributeError, OSError):
+        pass
 
 def setup_default_conf():
     """
